@@ -19,4 +19,4 @@ Afterwards, you can test the generated js code by opening the `index.html` file 
 
 ## Features
 I'm currently too lazy to list all the features in this document.
-A good pointer is to look at the source code of [`test/main.cc`](test/main.cc).
+A good pointer is to look at the source code of [`test/main.cc`](test/main.cc) and [`test/jstest.cc`](test/jstest.cc).

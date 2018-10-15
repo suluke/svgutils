@@ -1,0 +1,13 @@
+<!DOCTYPE html>
+<html>
+<head></head>
+<body></body>
+<script type="text/javascript" src="test.js"></script>
+<script type="text/javascript">
+  const svg = makeSVG(300, 200);
+  document.body.appendChild(svg);
+  const rect = makeRect(75, 50, '50%', '50%');
+  rect.setAttributeNS(null, 'fill', '#ff0000');
+  svg.appendChild(rect);
+</script>
+</html>

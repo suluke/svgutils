@@ -6,7 +6,8 @@ if (NOT ${CMAKE_COMPILER_IS_GNUCXX})
   set(CMAKE_CXX_STANDARD 2a)
 endif()
 
-add_executable(test test/main.cc lib/svg_utils.cc)
+include_directories(include/)
+add_compile_options(-Wall -Werror)
 
-target_include_directories(test PRIVATE include/)
-target_compile_options(test PRIVATE -Wall -Werror)
+add_executable(test test/main.cc lib/svg_utils.cc)
+add_executable(jstest test/jstest.cc lib/svg_utils.cc)
