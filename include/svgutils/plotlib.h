@@ -1,138 +1,56 @@
 #ifndef SVGUTILS_PLOTLIB_H
 #define SVGUTILS_PLOTLIB_H
 
-#include "svg_utils.h"
+#include "plotlib_core.h"
 
-namespace svg {
+namespace plots {
 
-template <typename WriterTy>
-struct PlotWriter : public ExtendableWriter<PlotWriter<WriterTy>> {
-  using base_t = ExtendableWriter<PlotWriter<WriterTy>>;
+struct BoxStyle {
+  double boxWidth;
+  double topWhiskerWidth;
+  double bottomWhiskerWidth;
 
-  PlotWriter(svg::outstream_t &os)
-      : base_t(std::make_unique<WriterModel<WriterTy>>(os)) {}
+  std::vector<CSSRule> topWhiskerStyles;
+  std::vector<CSSRule> bottomWhiskerStyles;
+  std::vector<CSSRule> upperQuartileStyles;
+  std::vector<CSSRule> lowerQuartileStyles;
+  std::vector<CSSRule> medianStyles;
+  std::vector<CSSRule> boxLeftStyles;
+  std::vector<CSSRule> boxRightStyles;
+}; 
 
-  template <typename... attrs_t>
-  PlotWriter &grid(double top, double left, double width, double height,
-                   double distx, double disty, attrs_t... attrs) {
-    std::vector<SVGAttribute> attrVec({std::forward<attrs_t>(attrs)...});
-    return grid(top, left, width, height, distx, disty, attrVec);
-  }
-  template <typename container_t>
-  PlotWriter &grid(double top, double left, double width, double height,
-                   double distx, double disty, const container_t &attrs) {
-    std::vector<SVGAttribute> attrsExt(attrs.begin(), attrs.end());
-    auto &self = static_cast<base_t &>(*this);
-    for (double i = top; i <= top + height; i += disty) {
-      attrsExt.erase(attrsExt.begin() + attrs.size(), attrsExt.end());
-      attrsExt.insert(attrsExt.end(),
-                      {x1(left), y1(i), x2(left + width), y2(i)});
-      self.line(attrsExt);
-    }
-    for (double i = left; i < left + width; i += distx) {
-      attrsExt.erase(attrsExt.begin() + attrs.size(), attrsExt.end());
-      attrsExt.insert(attrsExt.end(),
-                      {x1(i), y1(top), x2(i), y2(top + height)});
-      self.line(attrsExt);
-    }
-    return *this;
-  }
-};
-struct PlotWriterConcept : public WriterConcept {
-  virtual PlotWriterConcept &grid(double top, double left, double width,
-                                  double height, double distx, double disty,
-                                  const std::vector<SVGAttribute> &attrs) = 0;
-  template <typename... attrs_t>
-  PlotWriterConcept &grid(double top, double left, double width, double height,
-                          double distx, double disty, attrs_t... attrs) {
-    std::vector<SVGAttribute> attrVec({std::forward<attrs_t>(attrs)...});
-    return grid(top, left, width, height, distx, disty, attrVec);
-  }
+struct BoxPlotData {
+  BoxPlotData() = default;
+  BoxPlotData(const BoxPlotData &) = default;
+  BoxPlotData &operator=(const BoxPlotData &) = default;
+  BoxPlotData(BoxPlotData &&) = default;
+  BoxPlotData &operator=(BoxPlotData &&) = default;
+
+  double topWhisker;
+  double bottomWhisker;
+  double upperQuartile;
+  double lowerQuartile;
+  double median;
+
+  void compile(PlotWriterConcept &writer, const BoxStyle &style, size_t x) const;
 };
 
-template <typename WriterTy>
-struct PlotWriterModel : public PlotWriterConcept, WriterModel<WriterTy> {
-  template <typename... args_t>
-  PlotWriterModel(args_t &&... args)
-      : WriterModel<WriterTy>(std::forward<args_t>(args)...) {}
-  PlotWriterConcept &grid(double top, double left, double width, double height,
-                          double distx, double disty,
-                          const std::vector<SVGAttribute> &attrs) override {
-    this->WriterModel<WriterTy>::Writer.grid(top, left, width, height, distx,
-                                             disty, attrs);
-    return *this;
-  }
-};
+struct BoxPlot : public Plot {
+  BoxPlot(std::string name) : Plot(std::move(name)) {}
 
-struct Plot {
-  Plot(std::string name) : name(std::move(name)) {}
-  virtual ~Plot() = default;
+  double getMinX() const override;
+  double getMaxX() const override;
+  double getMinY() const override;
+  double getMaxY() const override;
+  void renderPreview(PlotWriterConcept &writer) const override;
+  void compile(PlotWriterConcept &writer) const override;
 
-  virtual double getMinX() const = 0;
-  virtual double getMaxX() const = 0;
-  virtual double getMinY() const = 0;
-  virtual double getMaxY() const = 0;
-  virtual void renderPreview(PlotWriterConcept &writer) const = 0;
-  virtual void compile(PlotWriterConcept &writer) const = 0;
-
-  const std::string &getName() const { return name; }
+  void addData(BoxPlotData data) { this->data.emplace_back(std::move(data)); }
 
 private:
-  std::string name;
+  double plotPadding;
+  std::vector<BoxPlotData> data;
 };
 
-struct Legend {
-  virtual ~Legend() = default;
-  virtual double getWidth() const = 0;
-  virtual double getHeight() const = 0;
-  virtual void addPlot(Plot *plot) = 0;
-  virtual void compile(PlotWriterConcept &writer) const = 0;
-};
-
-struct Axis {
-  virtual ~Axis() = default;
-  void addPlot(std::unique_ptr<Plot> plot) {
-    plots.emplace_back(std::move(plot));
-  }
-  double getMinX() const { return minX; }
-  double getMaxX() const { return maxX; }
-  double getMinY() const { return minY; }
-  double getMaxY() const { return maxY; }
-  void setLegend(std::unique_ptr<Legend> legend) {
-    this->legend = std::move(legend);
-  }
-  virtual void compile(PlotWriterConcept &writer) const;
-
-private:
-  double minX;
-  double maxX;
-  double minY;
-  double maxY;
-  std::unique_ptr<Legend> legend;
-  std::vector<std::unique_ptr<Plot>> plots;
-};
-
-struct CSSRule {
-  const char *property;
-  std::string value;
-};
-
-struct Graph {
-  Graph(double width, double height) : width(width), height(height) {}
-
-  void addAxis(std::unique_ptr<Axis> axis) {
-    Axes.emplace_back(std::move(axis));
-  }
-  void addCSSRule(CSSRule rule) { CssRules.emplace_back(std::move(rule)); }
-
-  void compile(PlotWriterConcept &writer) const;
-
-private:
-  double width;
-  double height;
-  std::vector<std::unique_ptr<Axis>> Axes;
-  std::vector<CSSRule> CssRules;
-};
-
-} // namespace svg
+} // namespace plots
 #endif // SVGUTILS_PLOTLIB_H

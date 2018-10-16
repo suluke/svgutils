@@ -41,8 +41,10 @@ template <typename WriterTy> void testSVG() {
   ExtendedWriter svg(std::cout);
   svg.svg(width(300), height(200)).enter().helloWorld();
   // different writers are easily combinable if implemented correctly
-  PlotWriter<WriterTy> plot(std::cout);
-  svg.continueAs(plot).grid(0, 0, 300, 200, 10, 10, stroke("black"), stroke_dasharray("1 1")).finish();
+  plots::PlotWriter<WriterTy> plot(std::cout);
+  svg.continueAs(plot)
+      .grid(0, 0, 300, 200, 10, 10, stroke("black"), stroke_dasharray("1 1"))
+      .finish();
   std::cout << "\n" << std::endl;
 }
 
