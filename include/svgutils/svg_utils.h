@@ -240,6 +240,10 @@ private:
 /// writers.
 struct WriterConcept {
 #define SVG_TAG(NAME, STR, ...)                                                \
+  template <typename... attrs_t> void NAME(attrs_t... attrs) {                 \
+    std::vector<SVGAttribute> attrsVec({std::forward<attrs_t>(attrs)...});     \
+    NAME(attrsVec);                                                            \
+  }                                                                            \
   virtual void NAME(const std::vector<SVGAttribute> &attrs) = 0;
 #include "svg_entities.def"
   virtual void enter() = 0;
@@ -263,7 +267,7 @@ template <typename WriterTy> struct WriterModel : public WriterConcept {
   void content(const char *text) override { Writer.content(text); }
   void finish() override { Writer.finish(); }
 
-private:
+protected:
   WriterTy Writer;
 };
 

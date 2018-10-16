@@ -11,3 +11,4 @@ add_compile_options(-Wall -Werror)
 
 add_executable(test test/main.cc lib/svg_utils.cc)
 add_executable(jstest test/jstest.cc lib/svg_utils.cc)
+add_executable(plottest test/plottest.cc lib/plotlib.cc lib/svg_utils.cc)
