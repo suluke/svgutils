@@ -254,7 +254,7 @@ struct WriterConcept {
 
 /// Helper class to convert from virtual dispatch to template member
 /// functions.
-template <typename WriterTy> struct WriterModel : public WriterConcept {
+template <typename WriterTy> struct WriterModel : public virtual WriterConcept {
   template <typename... args_t>
   WriterModel(args_t &&... args) : Writer(std::forward<args_t>(args)...) {}
 #define SVG_TAG(NAME, STR, ...)                                                \

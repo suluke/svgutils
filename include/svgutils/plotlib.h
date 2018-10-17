@@ -5,7 +5,7 @@
 
 namespace plots {
 
-struct BoxStyle {
+struct BoxStyle final {
   double boxWidth;
   double topWhiskerWidth;
   double bottomWhiskerWidth;
@@ -17,9 +17,9 @@ struct BoxStyle {
   std::vector<CSSRule> medianStyles;
   std::vector<CSSRule> boxLeftStyles;
   std::vector<CSSRule> boxRightStyles;
-}; 
+};
 
-struct BoxPlotData {
+struct BoxPlotData final {
   BoxPlotData() = default;
   BoxPlotData(const BoxPlotData &) = default;
   BoxPlotData &operator=(const BoxPlotData &) = default;
@@ -32,7 +32,8 @@ struct BoxPlotData {
   double lowerQuartile;
   double median;
 
-  void compile(PlotWriterConcept &writer, const BoxStyle &style, size_t x) const;
+  void compile(PlotWriterConcept &writer, const BoxStyle &style,
+               size_t x) const;
 };
 
 struct BoxPlot : public Plot {

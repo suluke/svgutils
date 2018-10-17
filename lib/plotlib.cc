@@ -17,6 +17,7 @@ void Graph::compile(PlotWriterConcept &writer) const {
   writer.svg(svg::width(width), svg::height(height));
   for (const auto &Axis : Axes)
     Axis->compile(writer, width, height);
+  writer.finish();
 }
 
 template <typename container_t>
@@ -27,7 +28,8 @@ static std::string ConcatStyles(const container_t &styles) {
   return ss.str();
 }
 
-void BoxPlotData::compile(PlotWriterConcept &writer, const BoxStyle &style, size_t x) const {}
+void BoxPlotData::compile(PlotWriterConcept &writer, const BoxStyle &style,
+                          size_t x) const {}
 
 double BoxPlot::getMinX() const { return 0; }
 double BoxPlot::getMaxX() const { return data.size() + 1; }

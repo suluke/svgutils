@@ -10,7 +10,7 @@ struct SVGJSWriter : public svg::SVGWriterBase<SVGJSWriter> {
   using base_t = svg::SVGWriterBase<self_t>;
   using outstream_t = svg::outstream_t;
   SVGJSWriter(outstream_t &outstream,
-            const char *CreatedTagsListName = "rootTags")
+              const char *CreatedTagsListName = "rootTags")
       : base_t(outstream) {
     writeJSLine("if (typeof SVGWriterState === 'undefined')");
     ++indent;

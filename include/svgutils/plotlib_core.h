@@ -39,7 +39,7 @@ struct PlotWriter : public svg::ExtendableWriter<PlotWriter<WriterTy>> {
   }
 };
 
-struct PlotWriterConcept : public svg::WriterConcept {
+struct PlotWriterConcept : public virtual svg::WriterConcept {
   virtual PlotWriterConcept &
   grid(double top, double left, double width, double height, double distx,
        double disty, const std::vector<svg::SVGAttribute> &attrs) = 0;
@@ -52,15 +52,17 @@ struct PlotWriterConcept : public svg::WriterConcept {
 };
 
 template <typename WriterTy>
-struct PlotWriterModel : public PlotWriterConcept, svg::WriterModel<WriterTy> {
+struct PlotWriterModel : public PlotWriterConcept,
+                         public svg::WriterModel<WriterTy> {
+  using ModelBase_t = svg::WriterModel<WriterTy>;
   template <typename... args_t>
   PlotWriterModel(args_t &&... args)
-      : svg::WriterModel<WriterTy>(std::forward<args_t>(args)...) {}
+      : ModelBase_t(std::forward<args_t>(args)...) {}
   PlotWriterConcept &
   grid(double top, double left, double width, double height, double distx,
        double disty, const std::vector<svg::SVGAttribute> &attrs) override {
-    static_cast<svg::WriterModel<WriterTy> *>(this)->Writer.grid(
-        top, left, width, height, distx, disty, attrs);
+    this->ModelBase_t::Writer.grid(top, left, width, height, distx, disty,
+                                   attrs);
     return *this;
   }
 };
@@ -124,8 +126,9 @@ template <unsigned dim, typename data_t = double> struct Point {
 
 struct Axis {
   virtual ~Axis() = default;
-  void addPlot(std::unique_ptr<Plot> plot) {
+  template <typename PlotTy> PlotTy *addPlot(std::unique_ptr<PlotTy> plot) {
     plots.emplace_back(std::move(plot));
+    return static_cast<PlotTy *>(plots.back().get());
   }
   double getMinX() const { return minX; }
   double getMaxX() const { return maxX; }
@@ -155,8 +158,9 @@ struct CSSRule {
 struct Graph {
   Graph(double width, double height) : width(width), height(height) {}
 
-  void addAxis(std::unique_ptr<Axis> axis) {
+  template <typename AxisTy> AxisTy *addAxis(std::unique_ptr<AxisTy> axis) {
     Axes.emplace_back(std::move(axis));
+    return static_cast<AxisTy *>(Axes.back().get());
   }
   void addCSSRule(CSSRule rule) { CssRules.emplace_back(std::move(rule)); }
 
