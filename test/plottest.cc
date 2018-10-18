@@ -16,8 +16,10 @@ int main() {
     // struct has no virtual members (i.e. it's not supposed to be subclassed
     // - it's even marked `final`!) we avoid heap allocations and pass by
     // value
-    BoxPlotData data;
-    boxplot->addData(std::move(data));
+    BoxPlotData data0(0, 1, 2, 3, 4);
+    BoxPlotData data1(0.5, 1, 2, 2.7, 3.5);
+    boxplot->addData(std::move(data0));
+    boxplot->addData(std::move(data1));
   }
   // PlotWriter is a template and therefore not usable as argument for
   // Graph's `compile` interface method. Wrapping it in a PlotWriterModel
@@ -25,6 +27,9 @@ int main() {
   PlotWriterModel<PlotWriter<svg::SVGFormattedWriter>> writer(std::cout);
   // When the graph is fully set up, we can 'compile' it, i.e. write it
   // out to a writer object.
+  g.addCSSRule({"width", "100%"});
+  g.addCSSRule({"height", "100%"});
   g.compile(writer);
+  writer.finish();
   return 0;
 }

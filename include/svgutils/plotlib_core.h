@@ -67,6 +67,8 @@ struct PlotWriterModel : public PlotWriterConcept,
   }
 };
 
+struct Axis;
+
 struct Plot {
   Plot(std::string name) : name(std::move(name)) {}
   virtual ~Plot() = default;
@@ -76,7 +78,7 @@ struct Plot {
   virtual double getMinY() const = 0;
   virtual double getMaxY() const = 0;
   virtual void renderPreview(PlotWriterConcept &writer) const = 0;
-  virtual void compile(PlotWriterConcept &writer) const = 0;
+  virtual void compile(PlotWriterConcept &writer, const Axis &axis) const = 0;
 
   const std::string &getName() const { return name; }
 
@@ -98,7 +100,7 @@ template <unsigned dim, typename data_t = double> struct Point {
   constexpr Point() = default;
   template <typename... args_t>
   constexpr Point(args_t &&... args)
-      : dimensions(std::forward<args_t>(args)...){};
+      : dimensions({{std::forward<args_t>(args)...}}){};
 
   constexpr data_t x() const {
     static_assert(dim > 0,

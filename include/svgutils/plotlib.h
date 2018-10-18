@@ -6,9 +6,9 @@
 namespace plots {
 
 struct BoxStyle final {
-  double boxWidth;
-  double topWhiskerWidth;
-  double bottomWhiskerWidth;
+  double boxWidth = 0.5;
+  double topWhiskerWidth = 0.5;
+  double bottomWhiskerWidth = 0.5;
 
   std::vector<CSSRule> topWhiskerStyles;
   std::vector<CSSRule> bottomWhiskerStyles;
@@ -25,15 +25,19 @@ struct BoxPlotData final {
   BoxPlotData &operator=(const BoxPlotData &) = default;
   BoxPlotData(BoxPlotData &&) = default;
   BoxPlotData &operator=(BoxPlotData &&) = default;
+  BoxPlotData(double bottom, double lower, double median, double upper,
+              double top)
+      : bottomWhisker(bottom), lowerQuartile(lower), median(median),
+        upperQuartile(upper), topWhisker(top) {}
 
-  double topWhisker;
   double bottomWhisker;
-  double upperQuartile;
   double lowerQuartile;
   double median;
+  double upperQuartile;
+  double topWhisker;
 
-  void compile(PlotWriterConcept &writer, const BoxStyle &style,
-               size_t x) const;
+  void compile(PlotWriterConcept &writer, const Axis &axis,
+               const BoxStyle &style, size_t x) const;
 };
 
 struct BoxPlot : public Plot {
@@ -44,7 +48,7 @@ struct BoxPlot : public Plot {
   double getMinY() const override;
   double getMaxY() const override;
   void renderPreview(PlotWriterConcept &writer) const override;
-  void compile(PlotWriterConcept &writer) const override;
+  void compile(PlotWriterConcept &writer, const Axis &axis) const override;
 
   void addData(BoxPlotData data) { this->data.emplace_back(std::move(data)); }
 
