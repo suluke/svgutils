@@ -16,10 +16,9 @@ int main() {
     // struct has no virtual members (i.e. it's not supposed to be subclassed
     // - it's even marked `final`!) we avoid heap allocations and pass by
     // value
-    BoxPlotData data0(0, 1, 2, 3, 4);
-    BoxPlotData data1(0.5, 1, 2, 2.7, 3.5);
-    boxplot->addData(std::move(data0));
-    boxplot->addData(std::move(data1));
+    std::array<BoxPlotData, 3> data = {{{0.7, 1, 2, 3, 4}, {2.5, 3, 4, 4.5, 5}, {0.5, 1, 2, 2.7, 3.5}}};
+    for (const auto &box : data)
+      boxplot->addData(box);
   }
   // PlotWriter is a template and therefore not usable as argument for
   // Graph's `compile` interface method. Wrapping it in a PlotWriterModel

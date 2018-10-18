@@ -23,12 +23,22 @@ void Axis::compile(PlotWriterConcept &writer, double width,
     minY = std::min(Plot->getMinY(), minY);
     maxY = std::max(Plot->getMaxY(), maxY);
   }
+  double xRange = maxX - minX;
+  double yRange = maxY - minY;
+  {
+    maxY += 0.1 * yRange;
+    if (minY < 0)
+      minY -= 0.1 * yRange;
+    yRange = maxY - minY;
+  }
   using namespace svg;
   std::string trans;
   {
+    double xScale = width / xRange;
+    double yScale = height / yRange;
     std::stringstream ss;
-    ss << "translate(0, " << height << ") scale(" << width / (maxX - minX)
-       << ", -" << height / (maxY - minY) << ")";
+    ss << "translate(0, " << height + minY * yScale << ") scale(" << xScale
+       << ", -" << yScale << ")";
     trans = ss.str();
   }
   writer.g(x(0), y(0), transform(trans.c_str()));
