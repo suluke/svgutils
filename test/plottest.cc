@@ -16,7 +16,8 @@ int main() {
     // struct has no virtual members (i.e. it's not supposed to be subclassed
     // - it's even marked `final`!) we avoid heap allocations and pass by
     // value
-    std::array<BoxPlotData, 3> data = {{{0.7, 1, 2, 3, 4}, {2.5, 3, 4, 4.5, 5}, {0.5, 1, 2, 2.7, 3.5}}};
+    std::array<BoxPlotData, 3> data = {
+        {{0.7, 1, 2, 3, 4}, {2.5, 3, 4, 4.5, 5}, {0.5, 1, 2, 2.7, 3.5}}};
     for (const auto &box : data)
       boxplot->addData(box);
   }
@@ -26,8 +27,8 @@ int main() {
   PlotWriterModel<PlotWriter<svg::SVGFormattedWriter>> writer(std::cout);
   // When the graph is fully set up, we can 'compile' it, i.e. write it
   // out to a writer object.
-  g.addCSSRule({"width", "100%"});
-  g.addCSSRule({"height", "100%"});
+  g.addCSSRule({"width", "300px"});
+  g.addCSSRule({"height", "200px"});
   g.compile(writer);
   writer.finish();
   return 0;

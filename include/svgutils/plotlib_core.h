@@ -139,15 +139,20 @@ struct Axis {
   void setLegend(std::unique_ptr<Legend> legend) {
     this->legend = std::move(legend);
   }
-  virtual void compile(PlotWriterConcept &writer, double width,
-                       double height) const;
+  virtual void compile(PlotWriterConcept &writer, double width, double height);
   virtual Point<2> project(Point<2> p) const;
 
 private:
-  double minX;
-  double maxX;
-  double minY;
-  double maxY;
+  void updateBounds(double width, double height);
+
+  static inline constexpr double infty =
+      std::numeric_limits<double>::infinity();
+  double minX = infty;
+  double maxX = -infty;
+  double minY = infty;
+  double maxY = -infty;
+  double width;
+  double height;
   std::unique_ptr<Legend> legend;
   std::vector<std::unique_ptr<Plot>> plots;
 };

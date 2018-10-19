@@ -13,32 +13,29 @@ static std::string ConcatStyles(const container_t &styles) {
   return ss.str();
 }
 
-void Axis::compile(PlotWriterConcept &writer, double width,
-                   double height) const {
-  double infty = std::numeric_limits<double>::infinity();
-  double minX = infty, maxX = -infty, minY = infty, maxY = -infty;
-  for (const auto &Plot : plots) {
-    minX = std::min(Plot->getMinX(), minX);
-    maxX = std::max(Plot->getMaxX(), maxX);
-    minY = std::min(Plot->getMinY(), minY);
-    maxY = std::max(Plot->getMaxY(), maxY);
+void Axis::updateBounds(double width, double height) {
+  this->width = width;
+  this->height = height;
+  minX = infty;
+  maxX = -infty;
+  minY = infty;
+  maxY = -infty;
+  for (const auto &plot : plots) {
+    assert(plot && "Trying to add nullptr to plots");
+    minX = std::min(minX, plot->getMinX());
+    maxX = std::max(maxX, plot->getMaxX());
+    minY = std::min(minY, plot->getMinY());
+    maxY = std::max(maxY, plot->getMaxY());
   }
-  double xRange = maxX - minX;
-  double yRange = maxY - minY;
-  {
-    maxY += 0.1 * yRange;
-    if (minY < 0)
-      minY -= 0.1 * yRange;
-    yRange = maxY - minY;
-  }
+}
+
+void Axis::compile(PlotWriterConcept &writer, double width, double height) {
   using namespace svg;
+  updateBounds(width, height);
   std::string trans;
   {
-    double xScale = width / xRange;
-    double yScale = height / yRange;
     std::stringstream ss;
-    ss << "translate(0, " << height + minY * yScale << ") scale(" << xScale
-       << ", -" << yScale << ")";
+    ss << "translate(0 " << height << ") scale(1, -1)";
     trans = ss.str();
   }
   writer.g(x(0), y(0), transform(trans.c_str()));
@@ -47,9 +44,22 @@ void Axis::compile(PlotWriterConcept &writer, double width,
     Plot->compile(writer, *this);
   writer.leave();
 }
+
 Point<2> Axis::project(Point<2> p) const {
-  p.x(p.x());
-  p.y(p.y());
+  double minX = this->minX;
+  double maxX = this->maxX;
+  double minY = this->minY;
+  double maxY = this->maxY;
+  double xRange = maxX - minX;
+  double yRange = maxY - minY;
+  {
+    maxY += 0.1 * yRange;
+    if (minY < 0)
+      minY -= 0.1 * yRange;
+    yRange = maxY - minY;
+  }
+  p.x((p.x() - minX) * width / xRange);
+  p.y((p.y() - minY) * height / yRange);
   return p;
 }
 
@@ -75,7 +85,7 @@ static void writeHLine(PlotWriterConcept &writer, const Axis &axis, double x,
   Point<2> Left = axis.project(Point<2>(x - width / 2, y));
   Point<2> Right = axis.project(Point<2>(x + width / 2, y));
   writer.line(x1(Left.x()), y1(Left.y()), x2(Right.x()), y2(Right.y()),
-              svg::style("stroke: black;stroke-width: 0.1;"));
+              svg::style("stroke: black;stroke-width: 0.5;"));
 }
 
 static void writeVLine(PlotWriterConcept &writer, const Axis &axis, double x,
@@ -84,22 +94,30 @@ static void writeVLine(PlotWriterConcept &writer, const Axis &axis, double x,
   Point<2> Bottom = axis.project(Point<2>(x, y2));
   writer.line(x1(Top.x()), svg::y1(Top.y()), x2(Bottom.x()),
               svg::y2(Bottom.y()),
-              svg::style("stroke: black;stroke-width: 0.05;"));
+              svg::style("stroke: black;stroke-width: 0.5;"));
+}
+
+static void writeRect(PlotWriterConcept &writer, const Axis &axis, double x,
+                      double y, double width, double height) {
+  using namespace svg;
+  Point<2> BottomLeft = axis.project(Point<2>(x, y));
+  Point<2> TopRight = axis.project(Point<2>(x + width, y + height));
+  writer.rect(svg::x(BottomLeft.x() - width / 2), svg::y(BottomLeft.y()),
+              svg::width(TopRight.x() - BottomLeft.x()),
+              svg::height(TopRight.y() - BottomLeft.y()),
+              style("fill: white;stroke: black;stroke-width: 0.5;"));
 }
 
 void BoxPlotData::compile(PlotWriterConcept &writer, const Axis &axis,
                           const BoxStyle &style, size_t x) const {
   writeHLine(writer, axis, x, topWhisker, style.topWhiskerWidth);
-  writeHLine(writer, axis, x, upperQuartile, style.boxWidth);
-  writeHLine(writer, axis, x, median, style.boxWidth);
-  writeHLine(writer, axis, x, lowerQuartile, style.boxWidth);
-  writeHLine(writer, axis, x, bottomWhisker, style.bottomWhiskerWidth);
-  writeVLine(writer, axis, x, bottomWhisker, lowerQuartile);
-  writeVLine(writer, axis, x - style.boxWidth / 2 + 0.025, lowerQuartile,
-             upperQuartile);
-  writeVLine(writer, axis, x + style.boxWidth / 2 - 0.025, lowerQuartile,
-             upperQuartile);
+  writeVLine(writer, axis, x, bottomWhisker, upperQuartile);
+  writeRect(writer, axis, x - style.boxWidth / 2, lowerQuartile, style.boxWidth,
+            median - lowerQuartile);
+  writeRect(writer, axis, x - style.boxWidth / 2, median, style.boxWidth,
+            upperQuartile - median);
   writeVLine(writer, axis, x, upperQuartile, topWhisker);
+  writeHLine(writer, axis, x, bottomWhisker, style.bottomWhiskerWidth);
 }
 
 double BoxPlot::getMinX() const { return 0; }
