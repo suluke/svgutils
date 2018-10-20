@@ -2,6 +2,7 @@
 #define SVGUTILS_PLOTLIB_CORE_H
 
 #include "svg_utils.h"
+#include <optional>
 
 namespace plots {
 template <typename WriterTy>
@@ -126,35 +127,43 @@ template <unsigned dim, typename data_t = double> struct Point {
   }
 };
 
+struct AxisStyle {
+  enum Type { OUTER, INNER } type = OUTER;
+  bool grid = true;
+  double minX = 0;
+  double maxX;
+  double minY = 0;
+  double maxY;
+  double xStep = 1.;
+  double yStep = 1.;
+  std::string xLabel = "x";
+  std::string yLabel = "y";
+};
+
 struct Axis {
   virtual ~Axis() = default;
   template <typename PlotTy> PlotTy *addPlot(std::unique_ptr<PlotTy> plot) {
     plots.emplace_back(std::move(plot));
     return static_cast<PlotTy *>(plots.back().get());
   }
-  double getMinX() const { return minX; }
-  double getMaxX() const { return maxX; }
-  double getMinY() const { return minY; }
-  double getMaxY() const { return maxY; }
   void setLegend(std::unique_ptr<Legend> legend) {
     this->legend = std::move(legend);
   }
   virtual void compile(PlotWriterConcept &writer, double width, double height);
   virtual Point<2> project(Point<2> p) const;
+  AxisStyle &prepareStyle();
+  AxisStyle &getStyle();
+  const AxisStyle &getStyle() const {
+    assert(style);
+    return *style;
+  }
 
 private:
-  void updateBounds(double width, double height);
-
-  static inline constexpr double infty =
-      std::numeric_limits<double>::infinity();
-  double minX = infty;
-  double maxX = -infty;
-  double minY = infty;
-  double maxY = -infty;
   double width;
   double height;
   std::unique_ptr<Legend> legend;
   std::vector<std::unique_ptr<Plot>> plots;
+  std::optional<AxisStyle> style;
 };
 
 struct CSSRule {

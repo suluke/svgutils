@@ -13,15 +13,19 @@ static std::string ConcatStyles(const container_t &styles) {
   return ss.str();
 }
 
-void Axis::updateBounds(double width, double height) {
-  this->width = width;
-  this->height = height;
+template <typename plots_t>
+static void updateBounds(AxisStyle &style, const plots_t &plots) {
+  double &minX = style.minX;
+  double &maxX = style.maxX;
+  double &minY = style.minY;
+  double &maxY = style.maxY;
+  constexpr double infty = std::numeric_limits<double>::infinity();
   minX = infty;
   maxX = -infty;
   minY = infty;
   maxY = -infty;
   for (const auto &plot : plots) {
-    assert(plot && "Trying to add nullptr to plots");
+    assert(plot && "Found nullptr in plots");
     minX = std::min(minX, plot->getMinX());
     maxX = std::max(maxX, plot->getMaxX());
     minY = std::min(minY, plot->getMinY());
@@ -29,9 +33,25 @@ void Axis::updateBounds(double width, double height) {
   }
 }
 
+AxisStyle &Axis::getStyle() {
+  if (!style)
+    prepareStyle();
+  return *style;
+}
+AxisStyle &Axis::prepareStyle() {
+  style = AxisStyle();
+  updateBounds(*style, plots);
+  return *style;
+}
+
 void Axis::compile(PlotWriterConcept &writer, double width, double height) {
+  this->width = width;
+  this->height = height;
+  // initialize style if necessary
+  if (!style)
+    prepareStyle();
+  const AxisStyle &style = getStyle();
   using namespace svg;
-  updateBounds(width, height);
   std::string trans;
   {
     std::stringstream ss;
@@ -40,16 +60,31 @@ void Axis::compile(PlotWriterConcept &writer, double width, double height) {
   }
   writer.g(x(0), y(0), transform(trans.c_str()));
   writer.enter();
+  double xAxisY = 0.;
+  double yAxisX = 0.;
+  if (style.type == AxisStyle::OUTER) {
+    xAxisY = style.minY;
+    yAxisX = style.minX;
+  }
+  Point<2> xLeft(project({style.minX, xAxisY}));
+  Point<2> xRight(project({style.maxX, xAxisY}));
+  writer.line(x1(xLeft.x()), y1(xLeft.y()), x2(xRight.x()), y2(xRight.y()),
+              svg::style("stroke: black;stroke-width: 0.5;"));
+  Point<2> yTop(project({yAxisX, style.maxY}));
+  Point<2> yBottom(project({yAxisX, style.minY}));
+  writer.line(x1(yBottom.x()), y1(yBottom.y()), x2(yTop.x()), y2(yTop.y()),
+              svg::style("stroke: black;stroke-width: 0.5;"));
   for (const auto &Plot : plots)
     Plot->compile(writer, *this);
   writer.leave();
 }
 
 Point<2> Axis::project(Point<2> p) const {
-  double minX = this->minX;
-  double maxX = this->maxX;
-  double minY = this->minY;
-  double maxY = this->maxY;
+  const AxisStyle &style = getStyle();
+  double minX = style.minX;
+  double maxX = style.maxX;
+  double minY = style.minY;
+  double maxY = style.maxY;
   double xRange = maxX - minX;
   double yRange = maxY - minY;
   {
