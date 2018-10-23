@@ -20,19 +20,28 @@ if (NOT CAIRO_FOUND)
   set(SVG_UTILS_WITH_CAIRO OFF CACHE BOOL "Build with Cairo backend support" FORCE)
 endif()
 if (SVG_UTILS_WITH_CAIRO)
+  include_directories(${CAIRO_INCLUDE_DIRS})
   list(APPEND LIB_SOURCES lib/svg_cairo.cc)
 endif()
 
 add_library(${PROJECTNAME} ${LIB_SOURCES})
 
+if (SVG_UTILS_WITH_CAIRO)
+  target_link_libraries(${PROJECTNAME} PRIVATE ${CAIRO_LIBRARIES})
+endif()
+
 function(add_svgutils_test NAME)
   add_executable(${NAME} ${ARGN})
-  target_link_libraries(${NAME} ${PROJECTNAME})
+  target_link_libraries(${NAME} PRIVATE ${PROJECTNAME})
 endfunction()
 
 add_svgutils_test(test test/main.cc)
 add_svgutils_test(jstest test/jstest.cc)
 add_svgutils_test(plottest test/plottest.cc)
+if (SVG_UTILS_WITH_CAIRO)
+  add_svgutils_test(cairotest test/cairotest.cc)
+  target_link_libraries(cairotest PRIVATE stdc++fs)
+endif()
 
 # Check and update source code formatting
 file(GLOB_RECURSE CHECK_FORMAT_SOURCES
