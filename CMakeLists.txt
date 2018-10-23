@@ -1,6 +1,7 @@
 cmake_minimum_required(VERSION 3.11)
 set(PROJECTNAME svgutils)
 project(${PROJECTNAME} CXX C)
+set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
 set(CMAKE_CXX_STANDARD 17)
 # VA_OPT macro needs c++2a or gnu extensions
 if (NOT ${CMAKE_COMPILER_IS_GNUCXX})
@@ -10,9 +11,28 @@ endif()
 include_directories(include/)
 add_compile_options(-Wall -Werror)
 
-add_executable(test test/main.cc lib/svg_utils.cc)
-add_executable(jstest test/jstest.cc lib/svg_utils.cc)
-add_executable(plottest test/plottest.cc lib/plotlib.cc lib/svg_utils.cc)
+set(LIB_SOURCES lib/svg_utils.cc lib/plotlib.cc)
+
+find_package(Cairo)
+option(SVG_UTILS_WITH_CAIRO "Build with Cairo backend support" ON)
+if (NOT CAIRO_FOUND)
+  message(STATUS "Unable to find Cairo. Disabling Cairo support...")
+  set(SVG_UTILS_WITH_CAIRO OFF CACHE BOOL "Build with Cairo backend support" FORCE)
+endif()
+if (SVG_UTILS_WITH_CAIRO)
+  list(APPEND LIB_SOURCES lib/svg_cairo.cc)
+endif()
+
+add_library(${PROJECTNAME} ${LIB_SOURCES})
+
+function(add_svgutils_test NAME)
+  add_executable(${NAME} ${ARGN})
+  target_link_libraries(${NAME} ${PROJECTNAME})
+endfunction()
+
+add_svgutils_test(test test/main.cc)
+add_svgutils_test(jstest test/jstest.cc)
+add_svgutils_test(plottest test/plottest.cc)
 
 # Check and update source code formatting
 file(GLOB_RECURSE CHECK_FORMAT_SOURCES
