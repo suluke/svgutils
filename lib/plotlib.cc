@@ -33,6 +33,32 @@ static void updateBounds(AxisStyle &style, const plots_t &plots) {
   }
 }
 
+std::string FontInfo::getFontStyle() const {
+  std::stringstream ss;
+  ss << "font-family:" << font << ";font-size: " << fontSize << ";";
+  return ss.str();
+}
+double FontInfo::getWidth(std::string_view text, bool multiLine) const {
+  return text.size() * fontSize;
+}
+double FontInfo::getHeight(std::string_view text, bool multiLine) const {
+  return fontSize;
+}
+void FontInfo::placeText(const char *text, PlotWriterConcept &writer,
+                         Point<2> position, Point<2> anchor,
+                         bool multiLine) const {
+  if (multiLine)
+    std::cerr << "Warning: Multi-line text placing not implemented\n";
+  double w = getWidth(text, multiLine);
+  double h = getHeight(text, multiLine);
+  using namespace svg;
+  writer.text(x(position.x() + anchor.x() * w),
+              y(position.y() + anchor.y() * h));
+  writer.enter();
+  writer.content(text);
+  writer.leave();
+}
+
 AxisStyle &Axis::getStyle() {
   if (!style)
     prepareStyle();
@@ -44,7 +70,8 @@ AxisStyle &Axis::prepareStyle() {
   return *style;
 }
 
-void Axis::compile(PlotWriterConcept &writer, double width, double height) {
+void Axis::compile(PlotWriterConcept &writer, const Graph &graph, double width,
+                   double height) {
   this->width = width;
   this->height = height;
   // initialize style if necessary
@@ -93,8 +120,8 @@ Point<2> Axis::project(Point<2> p) const {
       minY -= 0.1 * yRange;
     yRange = maxY - minY;
   }
-  p.x((p.x() - minX) * width / xRange);
-  p.y((p.y() - minY) * height / yRange);
+  p.x((p.x() - minX) * width / xRange + translation.x());
+  p.y((p.y() - minY) * height / yRange + translation.y());
   return p;
 }
 
@@ -110,7 +137,7 @@ void Graph::compile(PlotWriterConcept &writer) const {
              style(ConcatStyles(CssRules).c_str()));
   writer.enter();
   for (const auto &Axis : Axes)
-    Axis->compile(writer, width, height);
+    Axis->compile(writer, *this, width, height);
   writer.leave();
 }
 

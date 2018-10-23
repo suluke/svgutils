@@ -2,7 +2,9 @@
 #define SVGUTILS_PLOTLIB_CORE_H
 
 #include "svg_utils.h"
+#include <functional>
 #include <optional>
+#include <string_view>
 
 namespace plots {
 template <typename WriterTy>
@@ -125,9 +127,76 @@ template <unsigned dim, typename data_t = double> struct Point {
         "Cannot set second dimension of vector with less than two dimensions");
     dimensions[1] = val;
   }
+
+  constexpr auto begin() { return dimensions.begin(); }
+  constexpr auto end() { return dimensions.end(); }
+  constexpr auto begin() const { return dimensions.begin(); }
+  constexpr auto end() const { return dimensions.end(); }
+
+  constexpr unsigned size() const { return dim; }
+
+  template <unsigned odim>
+  constexpr auto operator+(const Point<odim, data_t> &o) const {
+    constexpr unsigned maxDim = dim > odim ? dim : odim;
+    Point<maxDim, data_t> p;
+    auto outIt = p.begin();
+    for (auto D : dimensions)
+      *(outIt++) = D;
+    outIt = p.begin();
+    for (auto D : o.dimensions)
+      *(outIt++) = D;
+    return p;
+  }
+  template <unsigned odim>
+  constexpr auto operator-(const Point<odim, data_t> &o) const {
+    return *this + (o * -1.);
+  }
+  constexpr Point<dim, data_t> operator+(data_t o) const {
+    auto p = *this;
+    for (data_t &d : p)
+      d += o;
+    return p;
+  }
+  constexpr Point<dim, data_t> operator-(data_t o) const {
+    return *this + (-o);
+  }
+  constexpr Point<dim, data_t> operator*(data_t o) const {
+    auto p = *this;
+    for (data_t &d : p)
+      d *= o;
+    return p;
+  }
+};
+
+/// Simple base implementation of an interface to query font styles and
+/// text dimensions
+struct FontInfo {
+  FontInfo() = default;
+  FontInfo(std::string font, double fontSize)
+      : font(std::move(font)), fontSize(fontSize) {}
+  FontInfo(const FontInfo &) = default;
+  FontInfo(FontInfo &&) = default;
+  FontInfo &operator=(const FontInfo &) = default;
+  FontInfo &operator=(FontInfo &&) = default;
+
+  void setFont(std::string font) { font = std::move(font); }
+  void setSize(double s) { fontSize = s; }
+  double getSize() const { return fontSize; }
+
+  virtual std::string getFontStyle() const;
+  virtual double getWidth(std::string_view text, bool multiLine = false) const;
+  virtual double getHeight(std::string_view text, bool multiLine = false) const;
+  virtual void placeText(const char *text, PlotWriterConcept &writer,
+                         Point<2> position, Point<2> anchor = {0., 0.},
+                         bool multiLine = false) const;
+
+private:
+  std::string font = "Times, serif";
+  double fontSize = 12;
 };
 
 struct AxisStyle {
+  using TickGen = std::function<std::string(double coord)>;
   enum Type { OUTER, INNER } type = OUTER;
   bool grid = true;
   double minX = 0;
@@ -138,7 +207,11 @@ struct AxisStyle {
   double yStep = 1.;
   std::string xLabel = "x";
   std::string yLabel = "y";
+  TickGen xTickGen = [](double x) { return std::to_string(x); };
+  TickGen yTickGen = [](double y) { return std::to_string(y); };
 };
+
+struct Graph;
 
 struct Axis {
   virtual ~Axis() = default;
@@ -149,7 +222,8 @@ struct Axis {
   void setLegend(std::unique_ptr<Legend> legend) {
     this->legend = std::move(legend);
   }
-  virtual void compile(PlotWriterConcept &writer, double width, double height);
+  virtual void compile(PlotWriterConcept &writer, const Graph &graph,
+                       double width, double height);
   virtual Point<2> project(Point<2> p) const;
   AxisStyle &prepareStyle();
   AxisStyle &getStyle();
@@ -161,6 +235,7 @@ struct Axis {
 private:
   double width;
   double height;
+  Point<2> translation;
   std::unique_ptr<Legend> legend;
   std::vector<std::unique_ptr<Plot>> plots;
   std::optional<AxisStyle> style;
@@ -172,13 +247,16 @@ struct CSSRule {
 };
 
 struct Graph {
-  Graph(double width, double height) : width(width), height(height) {}
+  Graph(double width, double height, std::unique_ptr<FontInfo> font = nullptr)
+      : width(width), height(height),
+        font(font ? std::move(font) : std::make_unique<FontInfo>()) {}
 
   template <typename AxisTy> AxisTy *addAxis(std::unique_ptr<AxisTy> axis) {
     Axes.emplace_back(std::move(axis));
     return static_cast<AxisTy *>(Axes.back().get());
   }
   void addCSSRule(CSSRule rule) { CssRules.emplace_back(std::move(rule)); }
+  FontInfo &getFontInfo() const { return *font; }
 
   void compile(PlotWriterConcept &writer) const;
 
@@ -187,6 +265,7 @@ private:
   double height;
   std::vector<std::unique_ptr<Axis>> Axes;
   std::vector<CSSRule> CssRules;
+  std::unique_ptr<FontInfo> font;
 };
 
 } // namespace plots
