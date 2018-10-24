@@ -24,6 +24,7 @@ struct SVGAttribute {
   SVGAttribute &operator=(const SVGAttribute &) = default;
   const char *getName() const { return name; }
   std::string getValue() const;
+  double toDouble() const;
   template <typename T> void setValue(T value) { this->value = value; }
   inline friend outstream_t &operator<<(outstream_t &os,
                                         const SVGAttribute &attr) {
@@ -61,13 +62,34 @@ private:
 
 #define SVG_ATTR(NAME, STR, DEFAULT)                                           \
   struct NAME : public SVGAttribute {                                          \
-    template <typename T> NAME(T value) : SVGAttribute(NAME_name, value) {}    \
+    template <typename T> NAME(T value) : SVGAttribute(tagName, value) {}      \
     NAME();                                                                    \
                                                                                \
   private:                                                                     \
-    static const char *NAME_name;                                              \
+    template <typename DerivedTy, typename RetTy>                              \
+    friend class SVGAttributeVisitor;                                          \
+    static const char *tagName;                                                \
   };
 #include "svg_entities.def"
+
+template <typename DerivedTy, typename RetTy = void>
+struct SVGAttributeVisitor {
+  RetTy visit(const SVGAttribute &attr) {
+#define SVG_ATTR(NAME, STR, DEFAULT)                                           \
+  if (attr.getName() == NAME::tagName)                                         \
+    return static_cast<DerivedTy *>(this)->visit_NAME(                         \
+        static_cast<const NAME &>(attr));
+#include "svg_entities.def"
+  }
+#define SVG_ATTR(NAME, STR, DEFAULT)                                           \
+  RetTy visit_NAME(const NAME &) {                                             \
+    if constexpr (std::is_same_v<void, RetTy>)                                 \
+      return;                                                                  \
+    else                                                                       \
+      return RetTy();                                                          \
+  }
+#include "svg_entities.def"
+};
 
 /// Base implementation of a writer for svg documents.
 /// Allows overriding most member functions using CRTP.

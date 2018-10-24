@@ -10,9 +10,12 @@ namespace svg {
 // member approach allows client code to define their own attributes
 // outside of svg_entities.def
 #define SVG_ATTR(NAME, STR, DEFAULT)                                           \
-  NAME::NAME() : SVGAttribute(NAME_name, DEFAULT) {}                           \
-  const char *NAME::NAME_name = STR;
+  NAME::NAME() : SVGAttribute(tagName, DEFAULT) {}                             \
+  const char *NAME::tagName = STR;
 #include "svgutils/svg_entities.def"
+} // namespace svg
+
+using namespace svg;
 
 std::string SVGAttribute::getValue() const {
   std::string s;
@@ -27,4 +30,16 @@ std::string SVGAttribute::getValue() const {
       value);
   return s;
 }
-} // namespace svg
+double SVGAttribute::toDouble() const {
+  double res;
+  std::visit(
+      [&res](auto &&value) {
+        using T = std::decay_t<decltype(value)>;
+        if constexpr (std::is_same_v<T, const char *>)
+          res = std::stod(value);
+        else
+          res = value;
+      },
+      value);
+  return res;
+}
