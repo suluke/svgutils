@@ -1,4 +1,5 @@
 #include "svgcairo/svg_cairo.h"
+#include <cmath>
 
 using namespace svg;
 
@@ -100,6 +101,19 @@ CairoSVGWriter &
 CairoSVGWriter::circle(const CairoSVGWriter::AttrContainer &attrs) {
   closeTag();
   currentTag = TagType::circle;
+  double cx = 0., cy = 0., r = 0.;
+  struct AttrParser : public SVGAttributeVisitor<AttrParser> {
+    AttrParser(double &cx, double &cy, double &r) : cx(cx), cy(cy), r(r) {}
+    void visit_cx(const svg::cx &x) { cx = x.toDouble(); }
+    void visit_cy(const svg::cy &y) { cy = y.toDouble(); }
+    void visit_r(const svg::r &radius) { r = radius.toDouble(); }
+    double &cx;
+    double &cy;
+    double &r;
+  } attrParser(cx, cy, r);
+  for (const SVGAttribute &Attr : attrs)
+    attrParser.visit(Attr);
+  cairo_arc(cairo.get(), cx, cy, r, 0., 2 * M_PI);
   return *this;
 }
 CairoSVGWriter &
