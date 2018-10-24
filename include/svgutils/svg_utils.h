@@ -112,7 +112,6 @@ public:
     while (parents.size())
       static_cast<DerivedTy *>(this)->leave();
     static_cast<DerivedTy *>(this)->closeTag();
-    currentTag = nullptr;
     return *static_cast<DerivedTy *>(this);
   }
 
