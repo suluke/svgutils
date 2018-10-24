@@ -10,8 +10,6 @@ namespace svg {
 
 namespace fs = std::filesystem;
 
-/// Base implementation of a writer for svg documents.
-/// Allows overriding most member functions using CRTP.
 class CairoSVGWriter {
 public:
   using self_t = CairoSVGWriter;
@@ -34,6 +32,11 @@ public:
   self_t &finish();
 
 private:
+  void closeTag();
+
+  enum class TagType;
+  TagType currentTag;
+  std::stack<TagType> parents;
   fs::path outfile;
   std::unique_ptr<cairo_surface_t, decltype(&cairo_surface_destroy)> surface;
   std::unique_ptr<cairo_t, decltype(&cairo_destroy)> cairo;
