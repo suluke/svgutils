@@ -1,6 +1,8 @@
 #ifndef SVGUTILS_SVG_UTILS_H
 #define SVGUTILS_SVG_UTILS_H
 
+#include "svgutils/utils.h"
+
 #include <cassert>
 #include <cstdint>
 #include <iostream>
@@ -80,6 +82,7 @@ struct SVGAttributeVisitor {
     return static_cast<DerivedTy *>(this)->visit_NAME(                         \
         static_cast<const NAME &>(attr));
 #include "svg_entities.def"
+    unreachable("Encountered unknown (foreign) attribute");
   }
 #define SVG_ATTR(NAME, STR, DEFAULT)                                           \
   RetTy visit_NAME(const NAME &) {                                             \
