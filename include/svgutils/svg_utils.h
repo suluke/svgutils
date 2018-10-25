@@ -79,13 +79,13 @@ struct SVGAttributeVisitor {
   RetTy visit(const SVGAttribute &attr) {
 #define SVG_ATTR(NAME, STR, DEFAULT)                                           \
   if (attr.getName() == NAME::tagName)                                         \
-    return static_cast<DerivedTy *>(this)->visit_NAME(                         \
+    return static_cast<DerivedTy *>(this)->visit_##NAME(                       \
         static_cast<const NAME &>(attr));
 #include "svg_entities.def"
     unreachable("Encountered unknown (foreign) attribute");
   }
 #define SVG_ATTR(NAME, STR, DEFAULT)                                           \
-  RetTy visit_NAME(const NAME &) {                                             \
+  RetTy visit_##NAME(const NAME &) {                                           \
     if constexpr (std::is_same_v<void, RetTy>)                                 \
       return;                                                                  \
     else                                                                       \
