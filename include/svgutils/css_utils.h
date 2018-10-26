@@ -31,7 +31,8 @@ struct CSSColor {
   CSSColor hsl2rgb() const;
   CSSColor rgb2hsl() const;
 
-  friend inline std::ostream &operator<<(std::ostream &os, const CSSColor &col) {
+  friend inline std::ostream &operator<<(std::ostream &os,
+                                         const CSSColor &col) {
     os << '#';
     for (unsigned i = 0; i < 4; ++i) {
       unsigned val8 = static_cast<unsigned>(col[i] * 255);
@@ -51,18 +52,32 @@ struct CSSUnit {
   enum Unit { PERCENT, PX, PT, PC, MM, CM, IN } unit = PX;
   double length = 0;
   static CSSUnit parse(std::string_view str);
-  operator double() const { return length; }
 
-  friend inline std::ostream &operator<<(std::ostream & os, const CSSUnit &unit) {
+  friend inline std::ostream &operator<<(std::ostream &os,
+                                         const CSSUnit &unit) {
     os << unit.length;
     switch (unit.unit) {
-      case PERCENT: os << "%"; break;
-      case PX: os << "px"; break;
-      case PT: os << "pt"; break;
-      case PC: os << "pc"; break;
-      case MM: os << "mm"; break;
-      case CM: os << "cm"; break;
-      case IN: os << "in"; break;
+    case PERCENT:
+      os << "%";
+      break;
+    case PX:
+      os << "px";
+      break;
+    case PT:
+      os << "pt";
+      break;
+    case PC:
+      os << "pc";
+      break;
+    case MM:
+      os << "mm";
+      break;
+    case CM:
+      os << "cm";
+      break;
+    case IN:
+      os << "in";
+      break;
     }
     return os;
   }
