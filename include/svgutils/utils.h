@@ -1,7 +1,11 @@
 #ifndef SVGUTILS_UTILS_H
 #define SVGUTILS_UTILS_H
+#include <cctype>
+//#include <charconv>
 #include <cstdlib>
 #include <iostream>
+#include <optional>
+#include <string_view>
 
 namespace svg {
 [[noreturn]] inline void unreachable_internal(const char *msg = nullptr,
@@ -14,6 +18,28 @@ namespace svg {
     std::cerr << " at " << file << ":" << line;
   std::cerr << "!\n";
   std::abort();
+}
+
+inline std::string_view strview_trim(std::string_view str) {
+  while (std::isspace(str.front()))
+    str = str.substr(1);
+  while (std::isspace(str.back()))
+    str = str.substr(0, str.size() - 1);
+  return str;
+}
+
+inline std::optional<double> strview_to_double(std::string_view str) {
+  // This should work in c++17 but it doesn't on my system (gcc) :(
+  // double c;
+  // auto fc_res = std::from_chars(val.data(), val.data() + val.size(), c);
+  // auto error = fc_res.ec;
+  std::string realStr(str.data(), str.size());
+  char *parseEnd;
+  double d = std::strtod(realStr.c_str(), &parseEnd);
+  bool error = parseEnd == realStr.c_str();
+  if (error)
+    return std::nullopt;
+  return d;
 }
 } // namespace svg
 
