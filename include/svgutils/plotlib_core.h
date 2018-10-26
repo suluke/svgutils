@@ -2,6 +2,7 @@
 #define SVGUTILS_PLOTLIB_CORE_H
 
 #include "svg_utils.h"
+#include "css_utils.h"
 #include <functional>
 #include <optional>
 #include <string_view>
@@ -241,11 +242,6 @@ private:
   std::optional<AxisStyle> style;
 };
 
-struct CSSRule {
-  const char *property;
-  std::string value;
-};
-
 struct Graph {
   Graph(double width, double height, std::unique_ptr<FontInfo> font = nullptr)
       : width(width), height(height),
@@ -255,7 +251,7 @@ struct Graph {
     Axes.emplace_back(std::move(axis));
     return static_cast<AxisTy *>(Axes.back().get());
   }
-  void addCSSRule(CSSRule rule) { CssRules.emplace_back(std::move(rule)); }
+  void addCSSRule(svg::CSSRule rule) { CssRules.emplace_back(std::move(rule)); }
   FontInfo &getFontInfo() const { return *font; }
 
   void compile(PlotWriterConcept &writer) const;
@@ -264,7 +260,7 @@ private:
   double width;
   double height;
   std::vector<std::unique_ptr<Axis>> Axes;
-  std::vector<CSSRule> CssRules;
+  std::vector<svg::CSSRule> CssRules;
   std::unique_ptr<FontInfo> font;
 };
 

@@ -10,13 +10,13 @@ struct BoxStyle final {
   double topWhiskerWidth = 0.5;
   double bottomWhiskerWidth = 0.5;
 
-  std::vector<CSSRule> topWhiskerStyles;
-  std::vector<CSSRule> bottomWhiskerStyles;
-  std::vector<CSSRule> upperQuartileStyles;
-  std::vector<CSSRule> lowerQuartileStyles;
-  std::vector<CSSRule> medianStyles;
-  std::vector<CSSRule> boxLeftStyles;
-  std::vector<CSSRule> boxRightStyles;
+  std::vector<svg::CSSRule> topWhiskerStyles;
+  std::vector<svg::CSSRule> bottomWhiskerStyles;
+  std::vector<svg::CSSRule> upperQuartileStyles;
+  std::vector<svg::CSSRule> lowerQuartileStyles;
+  std::vector<svg::CSSRule> medianStyles;
+  std::vector<svg::CSSRule> boxLeftStyles;
+  std::vector<svg::CSSRule> boxRightStyles;
 };
 
 struct BoxPlotData final {

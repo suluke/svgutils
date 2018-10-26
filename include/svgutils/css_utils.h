@@ -33,6 +33,11 @@ struct CSSColor {
   static CSSColor parseColor(std::string_view str);
 };
 
+struct CSSRule {
+  const char *property;
+  std::string value;
+};
+
 class StyleTracker {
 public:
   StyleTracker();
