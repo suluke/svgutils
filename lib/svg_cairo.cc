@@ -58,6 +58,16 @@ void CairoSVGWriter::openTag(TagType T,
   styles.push(attrs);
 }
 
+/// Utility function to extract a CSS unit from the value of an
+/// SVGAttribute
+static CSSUnit extractUnitFrom(const SVGAttribute &attr) {
+  if (const char *cstr = attr.cstrOrNull())
+    return CSSUnit::parse(cstr);
+  CSSUnit res;
+  res.length = attr.toDouble();
+  return res;
+}
+
 CairoSVGWriter &CairoSVGWriter::a(const CairoSVGWriter::AttrContainer &attrs) {
   openTag(TagType::a, attrs);
   return *this;
@@ -100,15 +110,15 @@ CairoSVGWriter::animateTransform(const CairoSVGWriter::AttrContainer &attrs) {
 CairoSVGWriter &
 CairoSVGWriter::circle(const CairoSVGWriter::AttrContainer &attrs) {
   openTag(TagType::circle, attrs);
-  double cx = 0., cy = 0., r = 0.;
+  CSSUnit cx, cy, r;
   struct AttrParser : public SVGAttributeVisitor<AttrParser> {
-    AttrParser(double &cx, double &cy, double &r) : cx(cx), cy(cy), r(r) {}
-    void visit_cx(const svg::cx &x) { cx = x.toDouble(); }
-    void visit_cy(const svg::cy &y) { cy = y.toDouble(); }
-    void visit_r(const svg::r &radius) { r = radius.toDouble(); }
-    double &cx;
-    double &cy;
-    double &r;
+    AttrParser(CSSUnit &cx, CSSUnit &cy, CSSUnit &r) : cx(cx), cy(cy), r(r) {}
+    void visit_cx(const svg::cx &x) { cx = extractUnitFrom(x); }
+    void visit_cy(const svg::cy &y) { cy = extractUnitFrom(y); }
+    void visit_r(const svg::r &radius) { r = extractUnitFrom(radius); }
+    CSSUnit &cx;
+    CSSUnit &cy;
+    CSSUnit &r;
   } attrParser(cx, cy, r);
   for (const SVGAttribute &Attr : attrs)
     attrParser.visit(Attr);
@@ -435,6 +445,27 @@ CairoSVGWriter::radialGradient(const CairoSVGWriter::AttrContainer &attrs) {
 CairoSVGWriter &
 CairoSVGWriter::rect(const CairoSVGWriter::AttrContainer &attrs) {
   openTag(TagType::rect, attrs);
+  CSSUnit x, y, width, height;
+  struct AttrParser : public SVGAttributeVisitor<AttrParser> {
+    AttrParser(CSSUnit &x, CSSUnit &y, CSSUnit &width, CSSUnit height)
+        : x(x), y(y), width(width), height(height) {}
+    void visit_x(const svg::x &xAttr) { x = extractUnitFrom(xAttr); }
+    void visit_y(const svg::y &yAttr) { y = extractUnitFrom(yAttr); }
+    void visit_width(const svg::width &w) { width = extractUnitFrom(w); }
+    void visit_height(const svg::height &h) { height = extractUnitFrom(h); }
+    CSSUnit &x;
+    CSSUnit &y;
+    CSSUnit &width;
+    CSSUnit &height;
+  } attrParser(x, y, width, height);
+  for (const SVGAttribute &Attr : attrs)
+    attrParser.visit(Attr);
+  std::cout << "rect: " << x << ", " << y << ", " << width << ", " << height
+            << std::endl;
+  cairo_rectangle(cairo.get(), x, y, width, height);
+  const CSSColor bg = styles.getFillColor();
+  cairo_set_source_rgba(cairo.get(), bg.r, bg.g, bg.b, bg.a);
+  cairo_fill(cairo.get());
   return *this;
 }
 CairoSVGWriter &

@@ -1,8 +1,8 @@
 #ifndef SVGUTILS_PLOTLIB_CORE_H
 #define SVGUTILS_PLOTLIB_CORE_H
 
-#include "svg_utils.h"
 #include "css_utils.h"
+#include "svg_utils.h"
 #include <functional>
 #include <optional>
 #include <string_view>
