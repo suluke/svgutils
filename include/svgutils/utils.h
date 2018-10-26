@@ -30,8 +30,8 @@ inline std::string_view strview_trim(std::string_view str) {
 
 inline std::optional<double> strview_to_double(std::string_view str) {
   // This should work in c++17 but it doesn't on my system (gcc) :(
-  // double c;
-  // auto fc_res = std::from_chars(val.data(), val.data() + val.size(), c);
+  // double d;
+  // auto fc_res = std::from_chars(str.data(), str.data() + str.size(), d);
   // auto error = fc_res.ec;
   std::string realStr(str.data(), str.size());
   char *parseEnd;

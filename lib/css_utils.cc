@@ -16,19 +16,20 @@ static const char *mapColorNameToValue(std::string_view name) {
 static size_t cvtHexChars(char higher, char lower) {
   size_t result;
   if ('0' <= higher && higher <= '9')
-    result = (higher - '0') << 4;
+    result = ((size_t) (higher - '0')) << 4;
   else if ('A' <= higher && higher <= 'Z')
-    result = (higher - 'A') << 4;
+    result = ((size_t) (higher - 'A' + 10)) << 4;
   else if ('a' <= higher && higher <= 'z')
-    result = (higher - 'a') << 4;
+    result = ((size_t) (higher - 'a' + 10)) << 4;
   else
     unreachable("Higher hex character not in valid range");
+
   if ('0' <= lower && lower <= '9')
     result += lower - '0';
   else if ('A' <= lower && lower <= 'Z')
-    result += lower - 'A';
+    result += lower - 'A' + 10;
   else if ('a' <= lower && lower <= 'z')
-    result += lower - 'a';
+    result += lower - 'a' + 10;
   else
     unreachable("Lower hex character not in valid range");
   return result;
