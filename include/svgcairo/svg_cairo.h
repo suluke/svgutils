@@ -2,6 +2,7 @@
 #define SVGCAIRO_SVG_CAIRO_H
 
 #include "svgutils/svg_utils.h"
+#include "svgutils/css_utils.h"
 
 #include <cairo/cairo-pdf.h>
 #include <filesystem>
@@ -32,16 +33,18 @@ public:
   self_t &finish();
 
 private:
-  void closeTag();
-
   enum class TagType;
   TagType currentTag;
   std::stack<TagType> parents;
   fs::path outfile;
   std::unique_ptr<cairo_surface_t, decltype(&cairo_surface_destroy)> surface;
   std::unique_ptr<cairo_t, decltype(&cairo_destroy)> cairo;
+  StyleTracker styles;
   double width;
   double height;
+
+  void openTag(TagType T, const AttrContainer &attrs);
+  void closeTag();
 };
 } // namespace svg
 #endif // SVGCAIRO_SVG_CAIRO_H
