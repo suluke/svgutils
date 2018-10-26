@@ -12,8 +12,10 @@ template <typename WriterTy>
 struct PlotWriter : public svg::ExtendableWriter<PlotWriter<WriterTy>> {
   using base_t = svg::ExtendableWriter<PlotWriter<WriterTy>>;
 
-  PlotWriter(svg::outstream_t &os)
-      : base_t(std::make_unique<svg::WriterModel<WriterTy>>(os)) {}
+  template <typename... args_t>
+  PlotWriter(args_t &&... args)
+      : base_t(std::make_unique<svg::WriterModel<WriterTy>>(
+            std::forward<args_t>(args)...)) {}
 
   template <typename... attrs_t>
   PlotWriter &grid(double top, double left, double width, double height,
