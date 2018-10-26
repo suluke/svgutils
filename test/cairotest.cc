@@ -1,8 +1,10 @@
 #include "svgcairo/svg_cairo.h"
+#include "svgutils/plotlib_core.h"
+#include "svgutils/svg_logging_writer.h"
 
 int main() {
   using namespace svg;
-  CairoSVGWriter writer("test.pdf", 300., 200.);
+  SVGLoggingWriter<CairoSVGWriter> writer("test.pdf", 300., 200.);
   // We can use containers to pass attributes as well
   std::vector<SVGAttribute> rectAttrs(
       {width("100%"), height("100%"), fill("red")});
@@ -18,5 +20,8 @@ int main() {
       .enter()
       .content("SVG")
       .leave();
+  // plots::PlotWriter<CairoSVGWriter> plot(std::move(writer));
+  // plot.grid(0, 0, 300, 200, 10, 10, stroke("black"), stroke_dasharray("1 1"))
+  //     .finish();
   return 0;
 }
