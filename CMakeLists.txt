@@ -11,7 +11,7 @@ endif()
 include_directories(include/)
 add_compile_options(-Wall -Werror)
 
-set(LIB_SOURCES lib/svg_utils.cc lib/plotlib.cc)
+set(LIB_SOURCES lib/svg_utils.cc lib/css_utils.cc lib/plotlib.cc)
 
 find_package(Cairo)
 option(SVG_UTILS_WITH_CAIRO "Build with Cairo backend support" ON)
