@@ -14,7 +14,8 @@ CairoSVGWriter::CairoSVGWriter(const fs::path &outfile, double width,
     : outfile(outfile),
       surface(cairo_pdf_surface_create(this->outfile.c_str(), width, height),
               cairo_surface_destroy),
-      cairo(cairo_create(surface.get()), cairo_destroy) {}
+      cairo(cairo_create(surface.get()), cairo_destroy), width(width),
+      height(height) {}
 
 CairoSVGWriter &CairoSVGWriter::content(const char *text) { return *this; }
 CairoSVGWriter &CairoSVGWriter::enter() {
@@ -56,6 +57,33 @@ void CairoSVGWriter::openTag(TagType T,
   closeTag();
   currentTag = T;
   styles.push(attrs);
+}
+
+static double convertCSSLength(const CSSUnit &unit) {
+  if (unit.unit == CSSUnit::PX)
+    return unit.length;
+  else if (unit.unit == CSSUnit::PT)
+    return unit.length * 1.25;
+  else if (unit.unit == CSSUnit::PC)
+    return unit.length * 15.;
+  else if (unit.unit == CSSUnit::MM)
+    return unit.length * 3.543307;
+  else if (unit.unit == CSSUnit::CM)
+    return unit.length * 35.43307;
+  else if (unit.unit == CSSUnit::IN)
+    return unit.length * 90.;
+  unreachable("Encountered unexpected css unit");
+}
+
+double CairoSVGWriter::convertCSSWidth(const CSSUnit &unit) const {
+  if (unit.unit == CSSUnit::PERCENT)
+    return unit.length / 100. * width;
+  return convertCSSLength(unit);
+}
+double CairoSVGWriter::convertCSSHeight(const CSSUnit &unit) const {
+  if (unit.unit == CSSUnit::PERCENT)
+    return unit.length / 100. * height;
+  return convertCSSLength(unit);
 }
 
 /// Utility function to extract a CSS unit from the value of an
@@ -122,7 +150,8 @@ CairoSVGWriter::circle(const CairoSVGWriter::AttrContainer &attrs) {
   } attrParser(cx, cy, r);
   for (const SVGAttribute &Attr : attrs)
     attrParser.visit(Attr);
-  cairo_arc(cairo.get(), cx, cy, r, 0., 2 * M_PI);
+  cairo_arc(cairo.get(), convertCSSWidth(cx), convertCSSHeight(cy),
+            convertCSSWidth(r), 0., 2 * M_PI);
   CSSColor bg = styles.getFillColor();
   cairo_set_source_rgba(cairo.get(), bg.r, bg.g, bg.b, bg.a);
   cairo_fill(cairo.get());
@@ -460,7 +489,8 @@ CairoSVGWriter::rect(const CairoSVGWriter::AttrContainer &attrs) {
   } attrParser(x, y, width, height);
   for (const SVGAttribute &Attr : attrs)
     attrParser.visit(Attr);
-  cairo_rectangle(cairo.get(), x, y, width, height);
+  cairo_rectangle(cairo.get(), convertCSSWidth(x), convertCSSHeight(y),
+                  convertCSSWidth(width), convertCSSHeight(height));
   const CSSColor bg = styles.getFillColor();
   cairo_set_source_rgba(cairo.get(), bg.r, bg.g, bg.b, bg.a);
   cairo_fill(cairo.get());

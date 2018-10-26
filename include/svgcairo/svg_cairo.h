@@ -45,6 +45,8 @@ private:
 
   void openTag(TagType T, const AttrContainer &attrs);
   void closeTag();
+  double convertCSSWidth(const CSSUnit &unit) const;
+  double convertCSSHeight(const CSSUnit &unit) const;
 };
 } // namespace svg
 #endif // SVGCAIRO_SVG_CAIRO_H
