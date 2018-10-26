@@ -16,6 +16,8 @@ public:
   using self_t = CairoSVGWriter;
   using AttrContainer = std::vector<SVGAttribute>;
   CairoSVGWriter(const fs::path &outfile, double width, double height);
+  CairoSVGWriter(CairoSVGWriter &&) = default;
+  CairoSVGWriter &operator=(CairoSVGWriter &&) = default;
 
 #define SVG_TAG(NAME, STR, ...)                                                \
   template <typename... attrs_t> self_t &NAME(attrs_t... attrs) {              \
