@@ -33,6 +33,13 @@ struct CSSColor {
   static CSSColor parseColor(std::string_view str);
 };
 
+struct CSSUnit {
+  enum Unit { PERCENT, PX, PT, PC, MM, CM, IN } unit = PX;
+  double length = 0;
+  static CSSUnit parse(std::string_view str);
+  operator double() const { return length; }
+};
+
 struct CSSRule {
   const char *property;
   std::string value;

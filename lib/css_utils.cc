@@ -1,8 +1,6 @@
 #include "svgutils/css_utils.h"
 #include "svgutils/svg_utils.h"
 
-//#include <charconv>
-#include <cstdlib>
 #include <limits>
 
 using namespace svg;
@@ -81,18 +79,11 @@ static CSSColor parseColorFromTuple(std::string_view tuple) {
     if (percentage)
       val = val.substr(0, val.size() - 1);
     // parse the component value from val
-    // This should work in c++17 but it doesn't on my system (gcc) :(
-    // double c;
-    // auto fc_res = std::from_chars(val.data(), val.data() + val.size(), c);
-    // auto error = fc_res.ec;
-    std::string valStr(val.data(), val.size());
-    char *parseEnd;
-    double c = std::strtod(valStr.c_str(), &parseEnd);
-    bool error = parseEnd == valStr.c_str();
-    if (!error) {
+    auto c = strview_to_double(val);
+    if (c) {
       if (percentage)
-        c /= 100.;
-      result[component] = c;
+        *c /= 100.;
+      result[component] = *c;
     } else {
       // exit early on error
       return CSSColor();
@@ -180,6 +171,34 @@ CSSColor CSSColor::parseColor(std::string_view str) {
   if (front5 == "hsla(")
     return parseColorFromTuple(str.substr(4)).hsl2rgb();
   return parseColor(mapColorNameToValue(str));
+}
+
+CSSUnit CSSUnit::parse(std::string_view str) {
+  str = strview_trim(str);
+  CSSUnit result;
+  if (str.back() == '%') {
+    result.unit = CSSUnit::PERCENT;
+    str = str.substr(0, str.size() - 1);
+  } else {
+    std::string_view back2 = str.substr(str.size() - 2);
+    if (back2 == "px")
+      result.unit = CSSUnit::PX;
+    else if (back2 == "pt")
+      result.unit = CSSUnit::PT;
+    else if (back2 == "pc")
+      result.unit = CSSUnit::PC;
+    else if (back2 == "mm")
+      result.unit = CSSUnit::MM;
+    else if (back2 == "cm")
+      result.unit = CSSUnit::CM;
+    else if (back2 == "in")
+      result.unit = CSSUnit::IN;
+    str = str.substr(0, str.size() - 2);
+  }
+  auto valopt = strview_to_double(str);
+  if (valopt)
+    result.length = *valopt;
+  return result;
 }
 
 enum class StyleTracker::Style {
