@@ -30,6 +30,19 @@ std::string SVGAttribute::getValue() const {
       value);
   return s;
 }
+const char *SVGAttribute::cstrOrNull() const {
+  const char *res;
+  std::visit(
+      [&res](auto &&value) {
+        using T = std::decay_t<decltype(value)>;
+        if constexpr (std::is_same_v<T, const char *>)
+          res = value;
+        else
+          res = nullptr;
+      },
+      value);
+  return res;
+}
 double SVGAttribute::toDouble() const {
   double res;
   std::visit(

@@ -26,6 +26,7 @@ struct SVGAttribute {
   SVGAttribute &operator=(const SVGAttribute &) = default;
   const char *getName() const { return name; }
   std::string getValue() const;
+  const char *cstrOrNull() const;
   double toDouble() const;
   template <typename T> void setValue(T value) { this->value = value; }
   inline friend outstream_t &operator<<(outstream_t &os,
