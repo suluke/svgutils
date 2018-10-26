@@ -251,6 +251,8 @@ StyleParser::parseStyles(const StyleTracker::AttrContainer &attrs) {
 } // namespace
 
 StyleTracker::StyleTracker() = default;
+StyleTracker::StyleTracker(StyleTracker &&) = default;
+StyleTracker &StyleTracker::operator=(StyleTracker &&) = default;
 StyleTracker::~StyleTracker() = default;
 
 void StyleTracker::push(const AttrContainer &attrs) {

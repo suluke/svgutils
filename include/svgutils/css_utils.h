@@ -91,6 +91,8 @@ struct CSSRule {
 class StyleTracker {
 public:
   StyleTracker();
+  StyleTracker(StyleTracker &&);
+  StyleTracker &operator=(StyleTracker &&);
   ~StyleTracker();
   using AttrContainer = std::vector<SVGAttribute>;
   void push(const AttrContainer &attrs);
