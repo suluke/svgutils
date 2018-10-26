@@ -447,7 +447,7 @@ CairoSVGWriter::rect(const CairoSVGWriter::AttrContainer &attrs) {
   openTag(TagType::rect, attrs);
   CSSUnit x, y, width, height;
   struct AttrParser : public SVGAttributeVisitor<AttrParser> {
-    AttrParser(CSSUnit &x, CSSUnit &y, CSSUnit &width, CSSUnit height)
+    AttrParser(CSSUnit &x, CSSUnit &y, CSSUnit &width, CSSUnit &height)
         : x(x), y(y), width(width), height(height) {}
     void visit_x(const svg::x &xAttr) { x = extractUnitFrom(xAttr); }
     void visit_y(const svg::y &yAttr) { y = extractUnitFrom(yAttr); }
@@ -460,8 +460,6 @@ CairoSVGWriter::rect(const CairoSVGWriter::AttrContainer &attrs) {
   } attrParser(x, y, width, height);
   for (const SVGAttribute &Attr : attrs)
     attrParser.visit(Attr);
-  std::cout << "rect: " << x << ", " << y << ", " << width << ", " << height
-            << std::endl;
   cairo_rectangle(cairo.get(), x, y, width, height);
   const CSSColor bg = styles.getFillColor();
   cairo_set_source_rgba(cairo.get(), bg.r, bg.g, bg.b, bg.a);
