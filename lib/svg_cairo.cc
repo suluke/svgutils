@@ -418,7 +418,8 @@ CairoSVGWriter::line(const CairoSVGWriter::AttrContainer &attrs) {
   openTag(TagType::line, attrs);
   CSSUnit x1, y1, x2, y2;
   struct AttrParser : public SVGAttributeVisitor<AttrParser> {
-    AttrParser(CSSUnit &x1, CSSUnit &y1, CSSUnit &x2, CSSUnit &y2) : x1(x1), y1(y1), x2(x2), y2(y2) {}
+    AttrParser(CSSUnit &x1, CSSUnit &y1, CSSUnit &x2, CSSUnit &y2)
+        : x1(x1), y1(y1), x2(x2), y2(y2) {}
     void visit_x1(const svg::x1 &x) { x1 = extractUnitFrom(x); }
     void visit_y1(const svg::y1 &y) { y1 = extractUnitFrom(y); }
     void visit_x2(const svg::x2 &x) { x2 = extractUnitFrom(x); }
@@ -432,12 +433,16 @@ CairoSVGWriter::line(const CairoSVGWriter::AttrContainer &attrs) {
     attrParser.visit(Attr);
   const CSSColor color = styles.getStrokeColor();
   const CSSUnit strokeWidth = styles.getStrokeWidth();
+  const CSSDashArray strokeDasharray = styles.getStrokeDasharray();
+  std::vector<double> dashes;
+  for (const CSSUnit &len : strokeDasharray.dashes)
+    dashes.emplace_back(convertCSSWidth(len));
   cairo_set_source_rgba(cairo.get(), color.r, color.g, color.b, color.a);
   // FIXME look up what percentages mean in stroke-width
+  cairo_set_dash(cairo.get(), dashes.data(), dashes.size(), 0.);
   cairo_set_line_width(cairo.get(), convertCSSWidth(strokeWidth));
   cairo_move_to(cairo.get(), convertCSSWidth(x1), convertCSSHeight(y1));
   cairo_line_to(cairo.get(), convertCSSWidth(x2), convertCSSHeight(y2));
-  cairo_close_path(cairo.get());
   cairo_stroke(cairo.get());
   return *this;
 }
