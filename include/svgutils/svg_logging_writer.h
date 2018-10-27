@@ -6,9 +6,11 @@
 namespace svg {
 
 template <typename WrappedTy> struct SVGLoggingWriter {
-  using self_t = SVGLoggingWriter;
+  using self_t = SVGLoggingWriter<WrappedTy>;
   template <typename... args_t>
   SVGLoggingWriter(args_t &&... args) : writer(std::forward<args_t>(args)...) {}
+  SVGLoggingWriter(self_t &&) = default;
+  self_t &operator=(self_t &&) = default;
 
 #define SVG_TAG(NAME, STR, ...)                                                \
   template <typename... attrs_t> self_t &NAME(attrs_t... attrs) {              \
