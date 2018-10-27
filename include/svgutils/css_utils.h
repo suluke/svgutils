@@ -45,7 +45,7 @@ struct CSSColor {
     return os;
   }
 
-  static CSSColor parseColor(std::string_view str);
+  static CSSColor parse(std::string_view str);
 };
 
 struct CSSUnit {
@@ -98,6 +98,8 @@ public:
   void push(const AttrContainer &attrs);
   void pop();
   CSSColor getFillColor() const;
+  CSSColor getStrokeColor() const;
+  CSSUnit getStrokeWidth() const;
 
   struct StyleDiff;
   enum class Style;

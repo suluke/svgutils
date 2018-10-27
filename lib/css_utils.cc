@@ -158,7 +158,7 @@ CSSColor CSSColor::rgb2hsl() const {
   return hsl;
 }
 
-CSSColor CSSColor::parseColor(std::string_view str) {
+CSSColor CSSColor::parse(std::string_view str) {
   if (str.front() == '#')
     return parseHexColor(str);
   const auto front4 = str.substr(0, 4);
@@ -171,30 +171,35 @@ CSSColor CSSColor::parseColor(std::string_view str) {
     return parseColorFromTuple(str.substr(4));
   if (front5 == "hsla(")
     return parseColorFromTuple(str.substr(4)).hsl2rgb();
-  return parseColor(mapColorNameToValue(str));
+  return parse(mapColorNameToValue(str));
 }
 
 CSSUnit CSSUnit::parse(std::string_view str) {
   str = strview_trim(str);
   CSSUnit result;
+  // One character will always be parsed as zero
+  if (str.size() == 1)
+    return result;
   if (str.back() == '%') {
     result.unit = CSSUnit::PERCENT;
     str = str.substr(0, str.size() - 1);
   } else {
     std::string_view back2 = str.substr(str.size() - 2);
-    if (back2 == "px")
-      result.unit = CSSUnit::PX;
-    else if (back2 == "pt")
-      result.unit = CSSUnit::PT;
-    else if (back2 == "pc")
-      result.unit = CSSUnit::PC;
-    else if (back2 == "mm")
-      result.unit = CSSUnit::MM;
-    else if (back2 == "cm")
-      result.unit = CSSUnit::CM;
-    else if (back2 == "in")
-      result.unit = CSSUnit::IN;
-    str = str.substr(0, str.size() - 2);
+    if (back2 == "px" || back2 == "pt" || back2 == "pc" || back2 == "mm" || back2 == "cm" || back2 == "in") {
+      if (back2 == "px")
+        result.unit = CSSUnit::PX;
+      else if (back2 == "pt")
+        result.unit = CSSUnit::PT;
+      else if (back2 == "pc")
+        result.unit = CSSUnit::PC;
+      else if (back2 == "mm")
+        result.unit = CSSUnit::MM;
+      else if (back2 == "cm")
+        result.unit = CSSUnit::CM;
+      else if (back2 == "in")
+        result.unit = CSSUnit::IN;
+      str = str.substr(0, str.size() - 2);
+    }
   }
   auto valopt = strview_to_double(str);
   if (valopt)
@@ -210,6 +215,7 @@ enum class StyleTracker::Style {
   FILL,
   STROKE,
   STROKE_WIDTH,
+  STROKE_DASHARRAY,
   TRANSFORM,
   OPACITY
 };
@@ -232,11 +238,29 @@ struct StyleParser
   using StyleDiff = StyleTracker::StyleDiff;
   static StyleDiff parseStyles(const StyleTracker::AttrContainer &attrs);
   StyleDiff visit_fill(const svg::fill &attr);
+  StyleDiff visit_stroke(const svg::stroke &attr);
+  StyleDiff visit_stroke_width(const svg::stroke_width &attr);
+  StyleDiff visit_stroke_dasharray(const svg::stroke_dasharray &attr);
 };
 
 StyleTracker::StyleDiff StyleParser::visit_fill(const svg::fill &attr) {
   StyleDiff diff;
   diff.styles[StyleTracker::Style::FILL] = attr.getValue();
+  return diff;
+}
+StyleTracker::StyleDiff StyleParser::visit_stroke(const svg::stroke &attr) {
+  StyleDiff diff;
+  diff.styles[StyleTracker::Style::STROKE] = attr.getValue();
+  return diff;
+}
+StyleTracker::StyleDiff StyleParser::visit_stroke_width(const svg::stroke_width &attr) {
+  StyleDiff diff;
+  diff.styles[StyleTracker::Style::STROKE_WIDTH] = attr.getValue();
+  return diff;
+}
+StyleTracker::StyleDiff StyleParser::visit_stroke_dasharray(const svg::stroke_dasharray &attr) {
+  StyleDiff diff;
+  diff.styles[StyleTracker::Style::STROKE_DASHARRAY] = attr.getValue();
   return diff;
 }
 
@@ -250,7 +274,24 @@ StyleParser::parseStyles(const StyleTracker::AttrContainer &attrs) {
 }
 } // namespace
 
-StyleTracker::StyleTracker() = default;
+StyleTracker::StyleTracker() {
+  StyleDiff initialStyles;
+  initialStyles.styles = {
+    {Style::BACKGROUND_COLOR, "white"},
+    {Style::FILL, "transparent"},
+    {Style::FONT_FAMILY, "serif"},
+    {Style::FONT_SIZE, "12px"},
+    {Style::FONT_WEIGHT, "normal"},
+    {Style::OPACITY, "1"},
+    {Style::STROKE, "black"},
+    {Style::STROKE_DASHARRAY, "none"},
+    {Style::STROKE_WIDTH, "1px"},
+    {Style::TRANSFORM, ""},
+  };
+  Cascade.emplace_back(std::move(initialStyles));
+  for (const auto &KeyValuePair : Cascade.back().styles)
+    CurrentStyle[KeyValuePair.first] = KeyValuePair.second;
+}
 StyleTracker::StyleTracker(StyleTracker &&o) : StyleTracker() {
   *this = std::move(o);
 }
@@ -292,6 +333,17 @@ void StyleTracker::pop() {
 
 CSSColor StyleTracker::getFillColor() const {
   if (CurrentStyle.count(Style::FILL))
-    return CSSColor::parseColor(CurrentStyle.at(Style::FILL));
+    return CSSColor::parse(CurrentStyle.at(Style::FILL));
   return CSSColor();
+}
+
+CSSColor StyleTracker::getStrokeColor() const {
+  if (CurrentStyle.count(Style::STROKE))
+    return CSSColor::parse(CurrentStyle.at(Style::STROKE));
+  return CSSColor();
+}
+CSSUnit StyleTracker::getStrokeWidth() const {
+  if (CurrentStyle.count(Style::STROKE_WIDTH))
+    return CSSUnit::parse(CurrentStyle.at(Style::STROKE_WIDTH));
+  return CSSUnit();
 }
