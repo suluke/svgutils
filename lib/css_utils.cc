@@ -251,8 +251,17 @@ StyleParser::parseStyles(const StyleTracker::AttrContainer &attrs) {
 } // namespace
 
 StyleTracker::StyleTracker() = default;
-StyleTracker::StyleTracker(StyleTracker &&) = default;
-StyleTracker &StyleTracker::operator=(StyleTracker &&) = default;
+StyleTracker::StyleTracker(StyleTracker &&o) : StyleTracker() {
+  *this = std::move(o);
+}
+StyleTracker &StyleTracker::operator=(StyleTracker &&o) {
+  Cascade = std::move(o.Cascade);
+  CurrentStyle.clear();
+  for (const StyleDiff &Diff : Cascade)
+    for (const auto &KeyValuePair : Diff.styles)
+      CurrentStyle[KeyValuePair.first] = KeyValuePair.second;
+  return *this;
+}
 StyleTracker::~StyleTracker() = default;
 
 void StyleTracker::push(const AttrContainer &attrs) {
