@@ -177,15 +177,13 @@ CSSColor CSSColor::parse(std::string_view str) {
 CSSUnit CSSUnit::parse(std::string_view str) {
   str = strview_trim(str);
   CSSUnit result;
-  // One character will always be parsed as zero
-  if (str.size() == 1)
-    return result;
   if (str.back() == '%') {
     result.unit = CSSUnit::PERCENT;
     str = str.substr(0, str.size() - 1);
-  } else {
+  } else if (str.size() >= 2) {
     std::string_view back2 = str.substr(str.size() - 2);
-    if (back2 == "px" || back2 == "pt" || back2 == "pc" || back2 == "mm" || back2 == "cm" || back2 == "in") {
+    if (back2 == "px" || back2 == "pt" || back2 == "pc" || back2 == "mm" ||
+        back2 == "cm" || back2 == "in") {
       if (back2 == "px")
         result.unit = CSSUnit::PX;
       else if (back2 == "pt")
@@ -204,6 +202,18 @@ CSSUnit CSSUnit::parse(std::string_view str) {
   auto valopt = strview_to_double(str);
   if (valopt)
     result.length = *valopt;
+  return result;
+}
+
+CSSDashArray CSSDashArray::parse(std::string_view str) {
+  CSSDashArray result;
+  str = strview_trim(str);
+  if (str == "none")
+    return result;
+  std::vector<std::string_view> splits;
+  strview_split(str, " ,", splits);
+  for (const auto &split : splits)
+    result.dashes.emplace_back(CSSUnit::parse(split));
   return result;
 }
 
@@ -253,12 +263,14 @@ StyleTracker::StyleDiff StyleParser::visit_stroke(const svg::stroke &attr) {
   diff.styles[StyleTracker::Style::STROKE] = attr.getValue();
   return diff;
 }
-StyleTracker::StyleDiff StyleParser::visit_stroke_width(const svg::stroke_width &attr) {
+StyleTracker::StyleDiff
+StyleParser::visit_stroke_width(const svg::stroke_width &attr) {
   StyleDiff diff;
   diff.styles[StyleTracker::Style::STROKE_WIDTH] = attr.getValue();
   return diff;
 }
-StyleTracker::StyleDiff StyleParser::visit_stroke_dasharray(const svg::stroke_dasharray &attr) {
+StyleTracker::StyleDiff
+StyleParser::visit_stroke_dasharray(const svg::stroke_dasharray &attr) {
   StyleDiff diff;
   diff.styles[StyleTracker::Style::STROKE_DASHARRAY] = attr.getValue();
   return diff;
@@ -277,16 +289,11 @@ StyleParser::parseStyles(const StyleTracker::AttrContainer &attrs) {
 StyleTracker::StyleTracker() {
   StyleDiff initialStyles;
   initialStyles.styles = {
-    {Style::BACKGROUND_COLOR, "white"},
-    {Style::FILL, "transparent"},
-    {Style::FONT_FAMILY, "serif"},
-    {Style::FONT_SIZE, "12px"},
-    {Style::FONT_WEIGHT, "normal"},
-    {Style::OPACITY, "1"},
-    {Style::STROKE, "black"},
-    {Style::STROKE_DASHARRAY, "none"},
-    {Style::STROKE_WIDTH, "1px"},
-    {Style::TRANSFORM, ""},
+      {Style::BACKGROUND_COLOR, "white"}, {Style::FILL, "transparent"},
+      {Style::FONT_FAMILY, "serif"},      {Style::FONT_SIZE, "12px"},
+      {Style::FONT_WEIGHT, "normal"},     {Style::OPACITY, "1"},
+      {Style::STROKE, "black"},           {Style::STROKE_DASHARRAY, "none"},
+      {Style::STROKE_WIDTH, "1px"},       {Style::TRANSFORM, ""},
   };
   Cascade.emplace_back(std::move(initialStyles));
   for (const auto &KeyValuePair : Cascade.back().styles)
@@ -346,4 +353,9 @@ CSSUnit StyleTracker::getStrokeWidth() const {
   if (CurrentStyle.count(Style::STROKE_WIDTH))
     return CSSUnit::parse(CurrentStyle.at(Style::STROKE_WIDTH));
   return CSSUnit();
+}
+CSSDashArray StyleTracker::getStrokeDasharray() const {
+  if (CurrentStyle.count(Style::STROKE_DASHARRAY))
+    return CSSDashArray::parse(CurrentStyle.at(Style::STROKE_DASHARRAY));
+  return CSSDashArray();
 }

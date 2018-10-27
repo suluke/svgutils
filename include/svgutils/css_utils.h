@@ -88,6 +88,11 @@ struct CSSRule {
   std::string value;
 };
 
+struct CSSDashArray {
+  std::vector<CSSUnit> dashes;
+  static CSSDashArray parse(std::string_view str);
+};
+
 class StyleTracker {
 public:
   StyleTracker();
@@ -100,6 +105,7 @@ public:
   CSSColor getFillColor() const;
   CSSColor getStrokeColor() const;
   CSSUnit getStrokeWidth() const;
+  CSSDashArray getStrokeDasharray() const;
 
   struct StyleDiff;
   enum class Style;
