@@ -181,6 +181,7 @@ struct FontInfo {
   FontInfo(FontInfo &&) = default;
   FontInfo &operator=(const FontInfo &) = default;
   FontInfo &operator=(FontInfo &&) = default;
+  virtual ~FontInfo() = default;
 
   void setFont(std::string font) { font = std::move(font); }
   void setSize(double s) { fontSize = s; }
