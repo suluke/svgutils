@@ -41,6 +41,21 @@ inline std::optional<double> strview_to_double(std::string_view str) {
     return std::nullopt;
   return d;
 }
+
+template <typename container_t>
+inline void strview_split(std::string_view str, std::string_view splitchars,
+                          /* out */ container_t &splits) {
+  do {
+    size_t splitpos = str.find_first_of(splitchars);
+    if (splitpos == std::string_view::npos) {
+      splits.emplace_back(str.substr(0, str.size()));
+      str = str.substr(str.size(), 0);
+    } else {
+      splits.emplace_back(str.substr(0, splitpos));
+      str = str.substr(splitpos + 1, str.size() - splitpos);
+    }
+  } while (str.size());
+}
 } // namespace svg
 
 #ifndef NDEBUG
