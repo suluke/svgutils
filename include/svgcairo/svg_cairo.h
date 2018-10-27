@@ -18,6 +18,8 @@ public:
   CairoSVGWriter(const fs::path &outfile, double width, double height);
   CairoSVGWriter(CairoSVGWriter &&) = default;
   CairoSVGWriter &operator=(CairoSVGWriter &&) = default;
+  CairoSVGWriter(const CairoSVGWriter &) = delete;
+  CairoSVGWriter &operator=(const CairoSVGWriter &) = delete;
 
 #define SVG_TAG(NAME, STR, ...)                                                \
   template <typename... attrs_t> self_t &NAME(attrs_t... attrs) {              \
@@ -38,7 +40,6 @@ private:
   enum class TagType;
   TagType currentTag;
   std::stack<TagType> parents;
-  fs::path outfile;
   std::unique_ptr<cairo_surface_t, decltype(&cairo_surface_destroy)> surface;
   std::unique_ptr<cairo_t, decltype(&cairo_destroy)> cairo;
   StyleTracker styles;

@@ -3,6 +3,15 @@
 
 using namespace svg;
 
+static void cairo_deleter(cairo_t *cr) {
+  if (!cr)
+    return;
+#ifndef NDEBUG
+  cairo_debug_reset_static_data();
+#endif
+  cairo_destroy(cr);
+}
+
 enum class CairoSVGWriter::TagType {
   NONE = 0,
 #define SVG_TAG(NAME, STR, ...) NAME,
@@ -11,16 +20,21 @@ enum class CairoSVGWriter::TagType {
 
 CairoSVGWriter::CairoSVGWriter(const fs::path &outfile, double width,
                                double height)
-    : outfile(outfile),
-      surface(cairo_pdf_surface_create(this->outfile.c_str(), width / 1.25,
+    : currentTag(TagType::NONE),
+      surface(cairo_pdf_surface_create(outfile.c_str(), width / 1.25,
                                        height / 1.25),
               cairo_surface_destroy),
-      cairo(cairo_create(surface.get()), cairo_destroy), width(width / 1.25),
-      height(height / 1.25) {}
+      cairo(cairo_create(surface.get()), cairo_deleter), width(width / 1.25),
+      height(height / 1.25) {
+  assert(cairo_surface_status(surface.get()) == CAIRO_STATUS_SUCCESS &&
+         "Error initializing cairo pdf surface");
+  assert(cairo_status(cairo.get()) == CAIRO_STATUS_SUCCESS &&
+         "Error initializing cairo context");
+}
 
 CairoSVGWriter &CairoSVGWriter::content(const char *text) { return *this; }
 CairoSVGWriter &CairoSVGWriter::enter() {
-  assert(currentTag && "Cannot enter without root tag");
+  assert(currentTag != TagType::NONE && "Cannot enter without root tag");
   parents.push(currentTag);
   currentTag = TagType::NONE;
   return *this;
@@ -51,6 +65,8 @@ void CairoSVGWriter::closeTag() {
     }
     styles.pop();
     currentTag = TagType::NONE;
+    assert(cairo_status(cairo.get()) == CAIRO_STATUS_SUCCESS &&
+           "Cairo is in an invalid state");
   }
 }
 
