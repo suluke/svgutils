@@ -12,10 +12,11 @@ enum class CairoSVGWriter::TagType {
 CairoSVGWriter::CairoSVGWriter(const fs::path &outfile, double width,
                                double height)
     : outfile(outfile),
-      surface(cairo_pdf_surface_create(this->outfile.c_str(), width, height),
+      surface(cairo_pdf_surface_create(this->outfile.c_str(), width / 1.25,
+                                       height / 1.25),
               cairo_surface_destroy),
-      cairo(cairo_create(surface.get()), cairo_destroy), width(width),
-      height(height) {}
+      cairo(cairo_create(surface.get()), cairo_destroy), width(width / 1.25),
+      height(height / 1.25) {}
 
 CairoSVGWriter &CairoSVGWriter::content(const char *text) { return *this; }
 CairoSVGWriter &CairoSVGWriter::enter() {
@@ -42,7 +43,8 @@ void CairoSVGWriter::closeTag() {
   if (currentTag != TagType::NONE) {
     switch (currentTag) {
     case TagType::svg:
-      cairo_pop_group(cairo.get());
+      cairo_pop_group_to_source(cairo.get());
+      cairo_paint(cairo.get());
       break;
     default:
       break;
@@ -60,19 +62,23 @@ void CairoSVGWriter::openTag(TagType T,
 }
 
 static double convertCSSLength(const CSSUnit &unit) {
+  double len = 0;
   if (unit.unit == CSSUnit::PX)
-    return unit.length;
+    len = unit.length;
   else if (unit.unit == CSSUnit::PT)
-    return unit.length * 1.25;
+    len = unit.length * 1.25;
   else if (unit.unit == CSSUnit::PC)
-    return unit.length * 15.;
+    len = unit.length * 15.;
   else if (unit.unit == CSSUnit::MM)
-    return unit.length * 3.543307;
+    len = unit.length * 3.543307;
   else if (unit.unit == CSSUnit::CM)
-    return unit.length * 35.43307;
+    len = unit.length * 35.43307;
   else if (unit.unit == CSSUnit::IN)
-    return unit.length * 90.;
-  unreachable("Encountered unexpected css unit");
+    len = unit.length * 90.;
+  else
+    unreachable("Encountered unexpected css unit");
+  // cairo units are pt (= 1/72in)
+  return len / 1.25;
 }
 
 double CairoSVGWriter::convertCSSWidth(const CSSUnit &unit) const {
