@@ -264,6 +264,8 @@ private:
 /// An interface describing the minimum feature set of svg document
 /// writers.
 struct WriterConcept {
+  virtual ~WriterConcept() = default;
+
 #define SVG_TAG(NAME, STR, ...)                                                \
   template <typename... attrs_t> void NAME(attrs_t... attrs) {                 \
     std::vector<SVGAttribute> attrsVec({std::forward<attrs_t>(attrs)...});     \
