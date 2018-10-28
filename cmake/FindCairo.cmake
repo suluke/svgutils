@@ -1,52 +1,35 @@
-find_path(CAIRO_INCLUDE_DIR cairo/cairo.h)
+# - Try to find Cairo
+# Once done, this will define
+#
+#  CAIRO_FOUND - system has Cairo
+#  CAIRO_INCLUDE_DIRS - the Cairo include directories
+#  CAIRO_LIBRARIES - link these to use Cairo
+#
+# This file is based on the example listed on
+# https://gitlab.kitware.com/cmake/community/wikis/doc/tutorials/How-To-Find-Libraries#using-libfindmacros
 
-find_library(CAIRO_LIBRARY NAMES cairo)
+include(LibFindMacros)
 
-find_file(CAIRO_RUNTIME_LIBRARY NAMES cairo.dll)
-find_file(EXPAT_RUNTIME_LIBRARY NAMES expat.dll)
-find_file(FONTCONFIG_RUNTIME_LIBRARY NAMES fontconfig.dll)
-find_file(PIXMAN_RUNTIME_LIBRARY NAMES pixman-1.dll)
+# Dependencies
+#libfind_package(CAIRO)
 
-include(FindPackageHandleStandardArgs)
-if (WIN32)
-    find_package_handle_standard_args(CAIRO DEFAULT_MSG
-        CAIRO_INCLUDE_DIR
+# Use pkg-config to get hints about paths
+#libfind_pkg_check_modules(CAIRO_PKGCONF)
 
-        CAIRO_LIBRARY
-
-        CAIRO_RUNTIME_LIBRARY
-        EXPAT_RUNTIME_LIBRARY
-        FONTCONFIG_RUNTIME_LIBRARY
-        PIXMAN_RUNTIME_LIBRARY
-    )
-else()
-    find_package_handle_standard_args(CAIRO DEFAULT_MSG
-        CAIRO_INCLUDE_DIR
-
-        CAIRO_LIBRARY
-    )
-endif()
-
-mark_as_advanced(
-    CAIRO_INCLUDE_DIR
-
-    CAIRO_LIBRARY
-
-    CAIRO_RUNTIME_LIBRARY
-    EXPAT_RUNTIME_LIBRARY
-    FONTCONFIG_RUNTIME_LIBRARY
-    PIXMAN_RUNTIME_LIBRARY
+# Include dir
+find_path(CAIRO_INCLUDE_DIR
+  NAMES cairo/cairo.h
+  PATHS ${CAIRO_PKGCONF_INCLUDE_DIRS}
 )
 
-set(CAIRO_INCLUDE_DIRS ${CAIRO_INCLUDE_DIR})
-
-set(CAIRO_LIBRARIES
-    ${CAIRO_LIBRARY}
+# Finally the library itself
+find_library(CAIRO_LIBRARY
+  NAMES cairo
+  PATHS ${CAIRO_PKGCONF_LIBRARY_DIRS}
 )
 
-set(CAIRO_RUNTIME_LIBRARIES
-    ${CAIRO_RUNTIME_LIBRARY}
-    ${EXPAT_RUNTIME_LIBRARY}
-    ${FONTCONFIG_RUNTIME_LIBRARY}
-    ${PIXMAN_RUNTIME_LIBRARY}
-)
+# Set the include dir variables and the libraries and let libfind_process do the rest.
+# NOTE: Singular variables for this library, plural for libraries this this lib depends on.
+set(CAIRO_PROCESS_INCLUDES CAIRO_INCLUDE_DIR)
+set(CAIRO_PROCESS_LIBS CAIRO_LIBRARY)
+libfind_process(CAIRO)
