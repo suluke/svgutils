@@ -102,10 +102,13 @@ public:
   using AttrContainer = std::vector<SVGAttribute>;
   void push(const AttrContainer &attrs);
   void pop();
+  CSSColor getColor() const;
   CSSColor getFillColor() const;
   CSSColor getStrokeColor() const;
   CSSUnit getStrokeWidth() const;
   CSSDashArray getStrokeDasharray() const;
+  std::string_view getFontFamily() const;
+  CSSUnit getFontSize() const;
 
   struct StyleDiff;
   enum class Style;

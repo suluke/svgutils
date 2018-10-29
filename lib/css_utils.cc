@@ -218,6 +218,7 @@ CSSDashArray CSSDashArray::parse(std::string_view str) {
 }
 
 enum class StyleTracker::Style {
+  COLOR,
   BACKGROUND_COLOR,
   FONT_FAMILY,
   FONT_SIZE,
@@ -247,12 +248,32 @@ struct StyleParser
     : public SVGAttributeVisitor<StyleParser, StyleTracker::StyleDiff> {
   using StyleDiff = StyleTracker::StyleDiff;
   static StyleDiff parseStyles(const StyleTracker::AttrContainer &attrs);
+  StyleDiff visit_color(const svg::color &attr);
+  StyleDiff visit_font_family(const svg::font_family &attr);
+  StyleDiff visit_font_size(const svg::font_size &attr);
   StyleDiff visit_fill(const svg::fill &attr);
   StyleDiff visit_stroke(const svg::stroke &attr);
   StyleDiff visit_stroke_width(const svg::stroke_width &attr);
   StyleDiff visit_stroke_dasharray(const svg::stroke_dasharray &attr);
 };
 
+StyleTracker::StyleDiff StyleParser::visit_color(const svg::color &attr) {
+  StyleDiff diff;
+  diff.styles[StyleTracker::Style::COLOR] = attr.getValue();
+  return diff;
+}
+StyleTracker::StyleDiff
+StyleParser::visit_font_family(const svg::font_family &attr) {
+  StyleDiff diff;
+  diff.styles[StyleTracker::Style::FONT_FAMILY] = attr.getValue();
+  return diff;
+}
+StyleTracker::StyleDiff
+StyleParser::visit_font_size(const svg::font_size &attr) {
+  StyleDiff diff;
+  diff.styles[StyleTracker::Style::FONT_SIZE] = attr.getValue();
+  return diff;
+}
 StyleTracker::StyleDiff StyleParser::visit_fill(const svg::fill &attr) {
   StyleDiff diff;
   diff.styles[StyleTracker::Style::FILL] = attr.getValue();
@@ -289,11 +310,17 @@ StyleParser::parseStyles(const StyleTracker::AttrContainer &attrs) {
 StyleTracker::StyleTracker() {
   StyleDiff initialStyles;
   initialStyles.styles = {
-      {Style::BACKGROUND_COLOR, "white"}, {Style::FILL, "transparent"},
-      {Style::FONT_FAMILY, "serif"},      {Style::FONT_SIZE, "12px"},
-      {Style::FONT_WEIGHT, "normal"},     {Style::OPACITY, "1"},
-      {Style::STROKE, "black"},           {Style::STROKE_DASHARRAY, "none"},
-      {Style::STROKE_WIDTH, "1px"},       {Style::TRANSFORM, ""},
+      {Style::COLOR, "black"},
+      {Style::BACKGROUND_COLOR, "white"},
+      {Style::FILL, "transparent"},
+      {Style::FONT_FAMILY, "serif"},
+      {Style::FONT_SIZE, "12px"},
+      {Style::FONT_WEIGHT, "normal"},
+      {Style::OPACITY, "1"},
+      {Style::STROKE, "black"},
+      {Style::STROKE_DASHARRAY, "none"},
+      {Style::STROKE_WIDTH, "1px"},
+      {Style::TRANSFORM, ""},
   };
   Cascade.emplace_back(std::move(initialStyles));
   for (const auto &KeyValuePair : Cascade.back().styles)
@@ -338,12 +365,16 @@ void StyleTracker::pop() {
     CurrentStyle.erase(KeyValuePair.first);
 }
 
+CSSColor StyleTracker::getColor() const {
+  if (CurrentStyle.count(Style::COLOR))
+    return CSSColor::parse(CurrentStyle.at(Style::COLOR));
+  return CSSColor();
+}
 CSSColor StyleTracker::getFillColor() const {
   if (CurrentStyle.count(Style::FILL))
     return CSSColor::parse(CurrentStyle.at(Style::FILL));
   return CSSColor();
 }
-
 CSSColor StyleTracker::getStrokeColor() const {
   if (CurrentStyle.count(Style::STROKE))
     return CSSColor::parse(CurrentStyle.at(Style::STROKE));
@@ -358,4 +389,14 @@ CSSDashArray StyleTracker::getStrokeDasharray() const {
   if (CurrentStyle.count(Style::STROKE_DASHARRAY))
     return CSSDashArray::parse(CurrentStyle.at(Style::STROKE_DASHARRAY));
   return CSSDashArray();
+}
+std::string_view StyleTracker::getFontFamily() const {
+  if (CurrentStyle.count(Style::FONT_FAMILY))
+    return CurrentStyle.at(Style::FONT_FAMILY);
+  return std::string_view();
+}
+CSSUnit StyleTracker::getFontSize() const {
+  if (CurrentStyle.count(Style::FONT_SIZE))
+    return CSSUnit::parse(CurrentStyle.at(Style::FONT_SIZE));
+  return CSSUnit();
 }
