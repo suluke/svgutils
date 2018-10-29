@@ -6,10 +6,11 @@ using namespace svg;
 static void cairo_deleter(cairo_t *cr) {
   if (!cr)
     return;
-#ifndef NDEBUG
-  cairo_debug_reset_static_data();
-#endif
   cairo_destroy(cr);
+#ifndef NDEBUG
+  // FIXME text rendering causes this to assert
+  // cairo_debug_reset_static_data();
+#endif
 }
 
 enum class CairoSVGWriter::TagType {
@@ -21,6 +22,7 @@ enum class CairoSVGWriter::TagType {
 CairoSVGWriter::CairoSVGWriter(const fs::path &outfile, double width,
                                double height)
     : currentTag(TagType::NONE),
+      fonts(/*FIXME proper checking of optional*/ *Freetype::Create()),
       surface(cairo_pdf_surface_create(outfile.c_str(), width / 1.25,
                                        height / 1.25),
               cairo_surface_destroy),
@@ -32,7 +34,39 @@ CairoSVGWriter::CairoSVGWriter(const fs::path &outfile, double width,
          "Error initializing cairo context");
 }
 
-CairoSVGWriter &CairoSVGWriter::content(const char *text) { return *this; }
+CairoSVGWriter &CairoSVGWriter::content(const char *text) {
+  closeTag();
+  assert(parents.size() && parents.top() == TagType::text &&
+         "Content is only supported in text nodes at the moment");
+  // Collect the style information
+  CSSUnit cssSize = styles.getFontSize();
+  double fontSize = convertCSSWidth(cssSize);
+  CSSColor color = styles.getColor();
+  std::string fontPattern(styles.getFontFamily());
+
+  FT_Face ftFont = fonts.getFace(fontPattern.c_str());
+  if (!ftFont)
+    unreachable("Error loading font");
+
+  cairo_save(cairo.get());
+
+  cairo_font_face_t *cairoFont =
+      cairo_ft_font_face_create_for_ft_face(ftFont, 0);
+  cairo_set_font_face(cairo.get(), cairoFont);
+  cairo_set_font_size(cairo.get(), fontSize);
+  cairo_set_source_rgba(cairo.get(), color.r, color.g, color.b, color.a);
+  cairo_move_to(cairo.get(), 80, 95);
+
+  cairo_show_text(cairo.get(), text);
+
+  cairo_restore(cairo.get());
+  cairo_set_font_face(cairo.get(), nullptr);
+  cairo_font_face_destroy(cairoFont);
+  return *this;
+  // FIXME: Don't use the toy api
+  // Reference:
+  // https://github.com/Distrotech/cairo/blob/17ef4acfcb64d1c525910a200e60d63087953c4c/src/cairo.c#L3197
+}
 CairoSVGWriter &CairoSVGWriter::enter() {
   assert(currentTag != TagType::NONE && "Cannot enter without root tag");
   parents.push(currentTag);

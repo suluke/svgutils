@@ -3,7 +3,9 @@
 
 #include "svgutils/svg_utils.h"
 #include "svgutils/css_utils.h"
+#include "svgcairo/freetype.h"
 
+#include <cairo/cairo-ft.h>
 #include <cairo/cairo-pdf.h>
 #include <filesystem>
 
@@ -40,9 +42,10 @@ private:
   enum class TagType;
   TagType currentTag;
   std::stack<TagType> parents;
+  Freetype fonts;
+  StyleTracker styles;
   std::unique_ptr<cairo_surface_t, decltype(&cairo_surface_destroy)> surface;
   std::unique_ptr<cairo_t, decltype(&cairo_destroy)> cairo;
-  StyleTracker styles;
   double width;
   double height;
 
