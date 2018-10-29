@@ -1,4 +1,5 @@
 #include "svgcairo/freetype.h"
+#include "svgutils/utils.h"
 
 #include <fontconfig/fontconfig.h>
 
@@ -19,8 +20,11 @@ struct Fontconfig {
 
   using Pattern = std::unique_ptr<FcPattern, decltype(&FcPatternDestroy)>;
   Pattern parsePattern(const char *str) const {
-    return Pattern(FcNameParse(reinterpret_cast<const FcChar8 *>(str)),
-                   FcPatternDestroy);
+    FcPattern *p = FcNameParse(reinterpret_cast<const FcChar8 *>(str));
+    if (!FcConfigSubstitute(config.get(), p, FcMatchPattern))
+      unreachable("Failed to substitute font pattern");
+    FcDefaultSubstitute(p);
+    return Pattern(p, FcPatternDestroy);
   }
   std::optional<std::filesystem::path> matchPattern(const Pattern &p) const {
     FcResult result;
@@ -33,7 +37,6 @@ struct Fontconfig {
       std::cerr << "Out of memory" << std::endl;
       return std::nullopt;
     }
-    // printPattern(match);
     FcValue val;
     result = FcPatternGet(match.get(), "file", 0, &val);
     if (result) {
