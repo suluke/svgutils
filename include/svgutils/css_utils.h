@@ -93,6 +93,8 @@ struct CSSDashArray {
   static CSSDashArray parse(std::string_view str);
 };
 
+enum class CSSTextAnchor { START, MIDDLE, END };
+
 class StyleTracker {
 public:
   StyleTracker();
@@ -103,12 +105,13 @@ public:
   void push(const AttrContainer &attrs);
   void pop();
   CSSColor getColor() const;
-  CSSColor getFillColor() const;
-  CSSColor getStrokeColor() const;
+  CSSColor getFill() const;
+  CSSColor getStroke() const;
   CSSUnit getStrokeWidth() const;
   CSSDashArray getStrokeDasharray() const;
   std::string_view getFontFamily() const;
   CSSUnit getFontSize() const;
+  CSSTextAnchor getTextAnchor() const;
 
   struct StyleDiff;
   enum class Style;

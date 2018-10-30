@@ -228,6 +228,7 @@ enum class StyleTracker::Style {
   STROKE_WIDTH,
   STROKE_DASHARRAY,
   TRANSFORM,
+  TEXT_ANCHOR,
   OPACITY
 };
 
@@ -255,6 +256,7 @@ struct StyleParser
   StyleDiff visit_stroke(const svg::stroke &attr);
   StyleDiff visit_stroke_width(const svg::stroke_width &attr);
   StyleDiff visit_stroke_dasharray(const svg::stroke_dasharray &attr);
+  StyleDiff visit_text_anchor(const svg::text_anchor &attr);
 };
 
 StyleTracker::StyleDiff StyleParser::visit_color(const svg::color &attr) {
@@ -296,6 +298,12 @@ StyleParser::visit_stroke_dasharray(const svg::stroke_dasharray &attr) {
   diff.styles[StyleTracker::Style::STROKE_DASHARRAY] = attr.getValue();
   return diff;
 }
+StyleTracker::StyleDiff
+StyleParser::visit_text_anchor(const svg::text_anchor &attr) {
+  StyleDiff diff;
+  diff.styles[StyleTracker::Style::TEXT_ANCHOR] = attr.getValue();
+  return diff;
+}
 
 StyleTracker::StyleDiff
 StyleParser::parseStyles(const StyleTracker::AttrContainer &attrs) {
@@ -320,6 +328,7 @@ StyleTracker::StyleTracker() {
       {Style::STROKE, "black"},
       {Style::STROKE_DASHARRAY, "none"},
       {Style::STROKE_WIDTH, "1px"},
+      {Style::TEXT_ANCHOR, "start"},
       {Style::TRANSFORM, ""},
   };
   Cascade.emplace_back(std::move(initialStyles));
@@ -370,15 +379,15 @@ CSSColor StyleTracker::getColor() const {
     return CSSColor::parse(CurrentStyle.at(Style::COLOR));
   return CSSColor();
 }
-CSSColor StyleTracker::getFillColor() const {
+CSSColor StyleTracker::getFill() const {
   if (CurrentStyle.count(Style::FILL))
     return CSSColor::parse(CurrentStyle.at(Style::FILL));
-  return CSSColor();
+  return getColor();
 }
-CSSColor StyleTracker::getStrokeColor() const {
+CSSColor StyleTracker::getStroke() const {
   if (CurrentStyle.count(Style::STROKE))
     return CSSColor::parse(CurrentStyle.at(Style::STROKE));
-  return CSSColor();
+  return getColor();
 }
 CSSUnit StyleTracker::getStrokeWidth() const {
   if (CurrentStyle.count(Style::STROKE_WIDTH))
@@ -399,4 +408,16 @@ CSSUnit StyleTracker::getFontSize() const {
   if (CurrentStyle.count(Style::FONT_SIZE))
     return CSSUnit::parse(CurrentStyle.at(Style::FONT_SIZE));
   return CSSUnit();
+}
+CSSTextAnchor StyleTracker::getTextAnchor() const {
+  if (CurrentStyle.count(Style::TEXT_ANCHOR)) {
+    auto anchorStr = CurrentStyle.at(Style::TEXT_ANCHOR);
+    if (anchorStr == "start")
+      return CSSTextAnchor::START;
+    else if (anchorStr == "middle")
+      return CSSTextAnchor::MIDDLE;
+    else if (anchorStr == "end")
+      return CSSTextAnchor::END;
+  }
+  return CSSTextAnchor::START;
 }
