@@ -1,5 +1,6 @@
 #include "svgcairo/svg_cairo.h"
 #include <cmath>
+#include <cstring>
 
 using namespace svg;
 
@@ -36,36 +37,100 @@ CairoSVGWriter::CairoSVGWriter(const fs::path &outfile, double width,
 
 CairoSVGWriter &CairoSVGWriter::content(const char *text) {
   closeTag();
+  // Reference:
+  // https://github.com/Distrotech/cairo/blob/17ef4acfcb64d1c525910a200e60d63087953c4c/src/cairo.c#L3197
   assert(parents.size() && parents.top() == TagType::text &&
          "Content is only supported in text nodes at the moment");
+  if (text == nullptr)
+    return *this;
+
+  if (cairo_status(cairo.get()))
+    unreachable("Cairo is in an invalid state");
+
   // Collect the style information
   CSSUnit cssSize = styles.getFontSize();
   double fontSize = convertCSSWidth(cssSize);
-  CSSColor color = styles.getColor();
+  CSSColor color = styles.getFill();
   std::string fontPattern(styles.getFontFamily());
+  CSSTextAnchor anchor = styles.getTextAnchor();
 
   FT_Face ftFont = fonts.getFace(fontPattern.c_str());
   if (!ftFont)
     unreachable("Error loading font");
 
-  cairo_save(cairo.get());
-
+  // Set up cairo font properties
   cairo_font_face_t *cairoFont =
       cairo_ft_font_face_create_for_ft_face(ftFont, 0);
   cairo_set_font_face(cairo.get(), cairoFont);
   cairo_set_font_size(cairo.get(), fontSize);
   cairo_set_source_rgba(cairo.get(), color.r, color.g, color.b, color.a);
-  cairo_move_to(cairo.get(), 80, 95);
+  int textlen = std::strlen(text);
+  double x, y;
+  cairo_get_current_point(cairo.get(), &x, &y);
 
-  cairo_show_text(cairo.get(), text);
+  cairo_scaled_font_t *scaled_font = cairo_get_scaled_font(cairo.get());
+  if (cairo_scaled_font_status(scaled_font))
+    unreachable("Error getting scaled font");
 
-  cairo_restore(cairo.get());
-  cairo_set_font_face(cairo.get(), nullptr);
-  cairo_font_face_destroy(cairoFont);
+  // Convert text to glyphs+clusters
+  auto glyphs = std::unique_ptr<cairo_glyph_t, decltype(&cairo_glyph_free)>(
+      nullptr, cairo_glyph_free);
+  auto clusters =
+      std::unique_ptr<cairo_text_cluster_t, decltype(&cairo_text_cluster_free)>(
+          nullptr, cairo_text_cluster_free);
+  int num_glyphs = 0;
+  int num_clusters = 0;
+  cairo_text_cluster_flags_t cluster_flags;
+  {
+    cairo_glyph_t *glyphs_raw = nullptr;
+    cairo_text_cluster_t *clusters_raw = nullptr;
+    cairo_status_t status = cairo_scaled_font_text_to_glyphs(
+        scaled_font, x, y, text, textlen, &glyphs_raw, &num_glyphs,
+        &clusters_raw, &num_clusters, &cluster_flags);
+    if (status)
+      unreachable("Failed to convert text to glyphs");
+
+    if (num_glyphs == 0)
+      return *this;
+
+    glyphs = {glyphs_raw, cairo_glyph_free};
+    clusters = {clusters_raw, cairo_text_cluster_free};
+  }
+
+  if (anchor != CSSTextAnchor::START) {
+    cairo_text_extents_t textextents;
+    cairo_scaled_font_glyph_extents(scaled_font, glyphs.get(), num_glyphs,
+                                    &textextents);
+    if (cairo_status(cairo.get()))
+      unreachable("Failed to retrieve glyph extents");
+    if (anchor == CSSTextAnchor::MIDDLE)
+      for (int i = 0; i < num_glyphs; ++i)
+        glyphs.get()[i].x -= textextents.x_advance / 2;
+    else if (anchor == CSSTextAnchor::END)
+      for (int i = 0; i < num_glyphs; ++i)
+        glyphs.get()[i].x -= textextents.x_advance;
+    else
+      unreachable("Invalid text anchor");
+  }
+
+  // Render the text
+  cairo_show_text_glyphs(cairo.get(), text, textlen, glyphs.get(), num_glyphs,
+                         clusters.get(), num_clusters, cluster_flags);
+  if (cairo_status(cairo.get()))
+    unreachable("Error drawing text glyphs");
+
+  // Move the drawing pencil to the end of the text
+  cairo_glyph_t *last_glyph = &glyphs.get()[num_glyphs - 1];
+  cairo_text_extents_t extents;
+  cairo_glyph_extents(cairo.get(), last_glyph, 1, &extents);
+  if (cairo_status(cairo.get()))
+    unreachable("Failed to retrieve extents of the last glyph");
+
+  x = last_glyph->x + extents.x_advance;
+  y = last_glyph->y + extents.y_advance;
+  cairo_move_to(cairo.get(), x, y);
+
   return *this;
-  // FIXME: Don't use the toy api
-  // Reference:
-  // https://github.com/Distrotech/cairo/blob/17ef4acfcb64d1c525910a200e60d63087953c4c/src/cairo.c#L3197
 }
 CairoSVGWriter &CairoSVGWriter::enter() {
   assert(currentTag != TagType::NONE && "Cannot enter without root tag");
@@ -208,7 +273,7 @@ CairoSVGWriter::circle(const CairoSVGWriter::AttrContainer &attrs) {
     attrParser.visit(Attr);
   cairo_arc(cairo.get(), convertCSSWidth(cx), convertCSSHeight(cy),
             convertCSSWidth(r), 0., 2 * M_PI);
-  CSSColor bg = styles.getFillColor();
+  CSSColor bg = styles.getFill();
   cairo_set_source_rgba(cairo.get(), bg.r, bg.g, bg.b, bg.a);
   cairo_fill(cairo.get());
   return *this;
@@ -465,7 +530,7 @@ CairoSVGWriter::line(const CairoSVGWriter::AttrContainer &attrs) {
   } attrParser(x1, y1, x2, y2);
   for (const SVGAttribute &Attr : attrs)
     attrParser.visit(Attr);
-  const CSSColor color = styles.getStrokeColor();
+  const CSSColor color = styles.getStroke();
   const CSSUnit strokeWidth = styles.getStrokeWidth();
   const CSSDashArray strokeDasharray = styles.getStrokeDasharray();
   std::vector<double> dashes;
@@ -575,7 +640,7 @@ CairoSVGWriter::rect(const CairoSVGWriter::AttrContainer &attrs) {
     attrParser.visit(Attr);
   cairo_rectangle(cairo.get(), convertCSSWidth(x), convertCSSHeight(y),
                   convertCSSWidth(width), convertCSSHeight(height));
-  const CSSColor bg = styles.getFillColor();
+  const CSSColor bg = styles.getFill();
   cairo_set_source_rgba(cairo.get(), bg.r, bg.g, bg.b, bg.a);
   cairo_fill(cairo.get());
   return *this;
@@ -624,6 +689,17 @@ CairoSVGWriter::symbol(const CairoSVGWriter::AttrContainer &attrs) {
 CairoSVGWriter &
 CairoSVGWriter::text(const CairoSVGWriter::AttrContainer &attrs) {
   openTag(TagType::text, attrs);
+  CSSUnit x, y;
+  struct AttrParser : public SVGAttributeVisitor<AttrParser> {
+    AttrParser(CSSUnit &x, CSSUnit &y) : x(x), y(y) {}
+    void visit_x(const svg::x &xAttr) { x = extractUnitFrom(xAttr); }
+    void visit_y(const svg::y &yAttr) { y = extractUnitFrom(yAttr); }
+    CSSUnit &x;
+    CSSUnit &y;
+  } attrParser(x, y);
+  for (const SVGAttribute &Attr : attrs)
+    attrParser.visit(Attr);
+  cairo_move_to(cairo.get(), convertCSSWidth(x), convertCSSHeight(y));
   return *this;
 }
 CairoSVGWriter &
