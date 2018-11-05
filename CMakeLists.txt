@@ -11,6 +11,8 @@ endif()
 include_directories(include/)
 add_compile_options(-Wall -Werror)
 
+add_subdirectory(utils)
+
 set(LIB_SOURCES lib/svg_utils.cc lib/css_utils.cc lib/plotlib.cc)
 
 find_package(Cairo)
@@ -29,7 +31,7 @@ endif()
 add_library(${PROJECTNAME} ${LIB_SOURCES})
 
 if (SVG_UTILS_WITH_CAIRO)
-  target_link_libraries(${PROJECTNAME} PRIVATE ${CAIRO_LIBRARIES} ${FONTCONFIG_LIBRARIES} Freetype::Freetype)
+  target_link_libraries(${PROJECTNAME} PRIVATE stdc++fs ${CAIRO_LIBRARIES} ${FONTCONFIG_LIBRARIES} Freetype::Freetype)
 endif()
 
 function(add_svgutils_test NAME)
@@ -42,7 +44,6 @@ add_svgutils_test(jstest test/jstest.cc)
 add_svgutils_test(plottest test/plottest.cc)
 if (SVG_UTILS_WITH_CAIRO)
   add_svgutils_test(cairotest test/cairotest.cc)
-  target_link_libraries(cairotest PRIVATE stdc++fs)
 endif()
 
 # Check and update source code formatting
@@ -50,6 +51,7 @@ file(GLOB_RECURSE CHECK_FORMAT_SOURCES
   include/svgutils/*.h
   lib/*.cc
   test/*.h test/*.cc
+  utils/*.h utils/*.cc
   )
 
 # Source code formatting using clang-format
