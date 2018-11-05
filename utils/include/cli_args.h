@@ -14,7 +14,13 @@
 
 namespace svg {
 namespace cl {
-///
+
+/// The name of a command line flag (i.e. CliOpt), i.e. the unique
+/// identifier after '-' or '--'.
+/// If a CliOpt is not given a name or the name is an empty string (or
+/// even nullptr) the option is automatically expected to handle all
+/// positional arguments. Use CliMetaName to still provide a meaningful
+/// short description for what these values are being used.
 struct CliName {
   constexpr CliName(std::string_view name) : name(name) {}
 
@@ -22,7 +28,9 @@ private:
   template <typename T> friend struct CliOpt;
   std::string_view name;
 };
-///
+
+/// A name for the value that is assigned to a CliOpt.
+/// E.g. FILENAME in `-o FILENAME`.
 struct CliMetaName {
   constexpr CliMetaName(std::string_view name) : name(name) {}
 
@@ -30,7 +38,9 @@ private:
   template <typename T> friend struct CliOpt;
   std::string_view name;
 };
-///
+
+/// A textual description of what a CliOpt does. Will be printed as part
+/// of the standard help output.
 struct CliDesc {
   constexpr CliDesc(std::string_view desc) : desc(desc) {}
 
@@ -38,7 +48,9 @@ private:
   template <typename T> friend struct CliOpt;
   std::string_view desc;
 };
-///
+
+/// A value to assign to an CliOpt in case no value was provided on the
+/// command line.
 template <typename ValTy> struct CliInit {
   constexpr CliInit(ValTy val) : val(val) {}
 
@@ -46,7 +58,10 @@ private:
   template <typename T> friend struct CliOpt;
   ValTy val;
 };
-///
+
+/// Associates a CliOpt with an external variable that is used for storing
+/// its value. Useful when making existing global variables configurable
+/// over the command line.
 template <typename ValTy> struct CliStorage {
   constexpr CliStorage(ValTy &val) : val(val) {}
 
@@ -54,15 +69,21 @@ private:
   template <typename T> friend struct CliOpt;
   ValTy &val;
 };
-///
+
+/// Indicates the "app" an option belongs to. The default AppTag is void.
 template <typename ValTy> struct CliAppTag {};
-///
+
+/// Indicates that a value for an option is required.
 struct CliRequired {};
 
+/// A free template function to be used by CliOpts to convert command
+/// line argument strings into the type of a corresponding option.
+/// For types not natively supported by this library clients need to
+/// provide their own specializations.
 template <typename T> std::optional<T> CliParseValue(std::string_view value);
 
+/// Implementation of a single-value command line option.
 template <typename ValTy> struct CliOpt {
-
   template <typename... args_t> constexpr CliOpt(args_t &&... args) {
     consume(std::forward<args_t>(args)...);
     if (!getPtr())
@@ -71,15 +92,21 @@ template <typename ValTy> struct CliOpt {
       registrator = &registerWithApp<void>;
     registrator(*this);
   }
+  /// Automatic conversion to the option's underlying value.
   operator ValTy &() const {
     ValTy *val = getPtr();
     assert(val && "Failed to find value");
     return *val;
   }
+  /// Use the dereference (->) operator in cases where implicit conversion
+  /// to ValTy fails, i.e. in member lookups.
   ValTy *operator->() {
     assert(getPtr() && "Casting cl::opt to value without initialization");
     return getPtr();
   }
+  /// Try to parse the given string_view to assign a value to this option.
+  /// Requires a matching specialization of the CliParseValue template
+  /// function.
   bool parse(std::string_view val) {
     auto parsed = CliParseValue<ValTy>(val);
     if (!parsed)
@@ -88,6 +115,9 @@ template <typename ValTy> struct CliOpt {
     valueGiven = true;
     return true;
   }
+  /// After all command line arguments have been processed, this function
+  /// is used for checking that this option is in a valid state.
+  /// E.g., `require`d options need to have been specified by the user.
   bool validate() const {
     if (required()) {
       if (!valueGiven) {
@@ -99,10 +129,18 @@ template <typename ValTy> struct CliOpt {
     }
     return true;
   }
+  /// The number of arguments this option consumes. For normal options,
+  /// this is 1. In contrast, boolean options have zero nargs, meaning
+  /// that a boolean option `-b` can only be set using just the flag
+  /// ('-b' -> b = true) or an immediate value following the flag with
+  /// an equals sign (e.g. `-b=true`, `-b=false`, `-b=on`, `-b=off`...)
   int nargs() const { return 1; }
+  /// Returns whether this is a required option or not.
   bool required() const {
     return Required;
   }
+  /// Prints a visual representation of this option to the specified
+  /// stream @p os.
   void display(std::ostream &os) const {
     if (name.size())
       os << "-" << name;
@@ -111,8 +149,17 @@ template <typename ValTy> struct CliOpt {
   }
 
 private:
+  /// The rationale behind using a unique_ptr to a heap-allocated ValTy
+  /// in case no storage is specified is that we want CliOpts to take as
+  /// little memory as possible in case storage *IS* specified. In that
+  /// case, making OwnedVal = ValTy, the `value` member would be the
+  /// same size as ValTy, i.e. taking twice as much storage as ValTy
   using OwnedVal = std::unique_ptr<ValTy>;
   std::variant<ValTy *, OwnedVal> value = nullptr;
+  /// Registration is performed dynamically after all configuration flags
+  /// passed to the constructor have been evaluated. It is possible to
+  /// register with a different AppTag, so the registration function
+  /// needs to be changeable.
   using RegistrationCB = void (*)(CliOpt<ValTy> &);
   RegistrationCB registrator = nullptr;
   std::string_view name = "";
@@ -121,6 +168,10 @@ private:
   bool Required = false;
   bool valueGiven = false;
 
+  /// Returns the storage location of this option. During option
+  /// initialization this function can return nullptr. However, after
+  /// the constructor has been executed this function should never
+  /// return nullptr.
   constexpr ValTy *getPtr() const {
     ValTy *val = nullptr;
     std::visit(
@@ -134,8 +185,10 @@ private:
         value);
     return val;
   }
-
+  /// Overload to be called after all flags passed to the constructor
+  /// have been `consume`d.
   constexpr void consume() {}
+
   template <typename... args_t>
   constexpr void consume(const CliName &name, args_t &&... args) {
     this->name = name.name;
@@ -182,6 +235,9 @@ private:
     Required = true;
     consume(std::forward<args_t>(args)...);
   }
+  /// Static function to be used for registering a CliOpt with a
+  /// ParseArg with a given AppTag. Definition follows further below
+  /// after ParseArg has been defined.
   template <typename AppTag> static void registerWithApp(CliOpt<ValTy> &);
 };
 
@@ -202,6 +258,7 @@ template <> int CliOpt<bool>::nargs() const { return 0; }
 
 //~ };
 
+/// Interface for all types of options.
 struct CliOptConcept {
   virtual ~CliOptConcept() = default;
   [[nodiscard]] virtual bool parse(std::string_view val) = 0;
@@ -214,6 +271,9 @@ protected:
   CliOptConcept() = default;
 };
 
+/// Generic implementation of the CliOptConcept interface that simply
+/// forwards all function calls to the corresponding function of the
+/// OptTy object this model references.
 template <typename OptTy> struct CliOptModel : public CliOptConcept {
   CliOptModel(OptTy &opt) : opt(opt) {}
   [[nodiscard]] bool parse(std::string_view val) override {
@@ -237,9 +297,14 @@ template <typename T> using init = CliInit<T>;
 template <typename T> using storage = CliStorage<T>;
 template <typename T> using opt = CliOpt<T>;
 
+/// Entry point to the cli_args library.
 template <typename AppTag = void> struct ParseArgs {
   using OwnedOption = std::unique_ptr<CliOptConcept>;
 
+  /// Parse the command line arguments specified by @p argc and @p argv.
+  /// The parameter @p tool is the application's name and @p desc should
+  /// contain a brief description of what the application does. Both
+  /// these values are used by the help message.
   ParseArgs(const char *tool, const char *desc, int argc, const char **argv) : tool(tool), desc(desc) {
     OwnedOption &eatAll = options()[""];
     int argNum = 1; // Skip executable name in argument parsing
@@ -316,6 +381,7 @@ template <typename AppTag = void> struct ParseArgs {
       bail();
   }
 
+  /// Prints a help message for this ParseArg instance.
   void printHelp() {
     std::cout << "usage: " << tool << " <OPTION>...";
     OwnedOption &eatAll = options()[""];
@@ -341,6 +407,7 @@ template <typename AppTag = void> struct ParseArgs {
     }
   }
 
+  /// Add an option to the ParseArg namespace denoted by AppTag.
   static void addOption(std::string_view name, OwnedOption opt) {
     assert(!options().count(name) && "Registered option more than once");
     options()[name] = std::move(opt);
@@ -351,6 +418,13 @@ private:
   const char *desc;
 
   using optionmap_t = std::map<std::string_view, OwnedOption>;
+  /// This function is used for implementing the registration process.
+  /// Since it is a template function it will be turned into a weak
+  /// symbol by the compiler which makes it possible to have only one
+  /// global container of registered options without requiring a
+  /// compilation unit. Furthermore, wrapping the static optionmap_t
+  /// inside the function fixes initialization order issues in conjunction
+  /// with statically initialized options.
   static optionmap_t &options();
   template <typename T> friend struct CliOpt;
 
