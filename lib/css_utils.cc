@@ -22,7 +22,7 @@ static size_t cvtHexChars(char higher, char lower) {
   else if ('a' <= higher && higher <= 'z')
     result = ((size_t)(higher - 'a' + 10)) << 4;
   else
-    unreachable("Higher hex character not in valid range");
+    svg_unreachable("Higher hex character not in valid range");
 
   if ('0' <= lower && lower <= '9')
     result += lower - '0';
@@ -31,7 +31,7 @@ static size_t cvtHexChars(char higher, char lower) {
   else if ('a' <= lower && lower <= 'z')
     result += lower - 'a' + 10;
   else
-    unreachable("Lower hex character not in valid range");
+    svg_unreachable("Lower hex character not in valid range");
   return result;
 }
 

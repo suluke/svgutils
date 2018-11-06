@@ -59,9 +59,9 @@ inline void strview_split(std::string_view str, std::string_view splitchars,
 } // namespace svg
 
 #ifndef NDEBUG
-#define unreachable(msg) unreachable_internal(msg, __FILE__, __LINE__)
+#define svg_unreachable(msg) unreachable_internal(msg, __FILE__, __LINE__)
 #else
-#define unreachable(msg) unreachable_internal()
+#define svg_unreachable(msg) unreachable_internal()
 #endif // NDEBUG
 
 #endif // SVGUTILS_UTILS_H

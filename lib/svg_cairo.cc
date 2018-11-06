@@ -45,7 +45,7 @@ CairoSVGWriter &CairoSVGWriter::content(const char *text) {
     return *this;
 
   if (cairo_status(cairo.get()))
-    unreachable("Cairo is in an invalid state");
+    svg_unreachable("Cairo is in an invalid state");
 
   // Collect the style information
   CSSUnit cssSize = styles.getFontSize();
@@ -56,7 +56,7 @@ CairoSVGWriter &CairoSVGWriter::content(const char *text) {
 
   FT_Face ftFont = fonts.getFace(fontPattern.c_str());
   if (!ftFont)
-    unreachable("Error loading font");
+    svg_unreachable("Error loading font");
 
   // Set up cairo font properties
   cairo_font_face_t *cairoFont =
@@ -70,7 +70,7 @@ CairoSVGWriter &CairoSVGWriter::content(const char *text) {
 
   cairo_scaled_font_t *scaled_font = cairo_get_scaled_font(cairo.get());
   if (cairo_scaled_font_status(scaled_font))
-    unreachable("Error getting scaled font");
+    svg_unreachable("Error getting scaled font");
 
   // Convert text to glyphs+clusters
   auto glyphs = std::unique_ptr<cairo_glyph_t, decltype(&cairo_glyph_free)>(
@@ -88,7 +88,7 @@ CairoSVGWriter &CairoSVGWriter::content(const char *text) {
         scaled_font, x, y, text, textlen, &glyphs_raw, &num_glyphs,
         &clusters_raw, &num_clusters, &cluster_flags);
     if (status)
-      unreachable("Failed to convert text to glyphs");
+      svg_unreachable("Failed to convert text to glyphs");
 
     if (num_glyphs == 0)
       return *this;
@@ -102,7 +102,7 @@ CairoSVGWriter &CairoSVGWriter::content(const char *text) {
     cairo_scaled_font_glyph_extents(scaled_font, glyphs.get(), num_glyphs,
                                     &textextents);
     if (cairo_status(cairo.get()))
-      unreachable("Failed to retrieve glyph extents");
+      svg_unreachable("Failed to retrieve glyph extents");
     if (anchor == CSSTextAnchor::MIDDLE)
       for (int i = 0; i < num_glyphs; ++i)
         glyphs.get()[i].x -= textextents.x_advance / 2;
@@ -110,21 +110,21 @@ CairoSVGWriter &CairoSVGWriter::content(const char *text) {
       for (int i = 0; i < num_glyphs; ++i)
         glyphs.get()[i].x -= textextents.x_advance;
     else
-      unreachable("Invalid text anchor");
+      svg_unreachable("Invalid text anchor");
   }
 
   // Render the text
   cairo_show_text_glyphs(cairo.get(), text, textlen, glyphs.get(), num_glyphs,
                          clusters.get(), num_clusters, cluster_flags);
   if (cairo_status(cairo.get()))
-    unreachable("Error drawing text glyphs");
+    svg_unreachable("Error drawing text glyphs");
 
   // Move the drawing pencil to the end of the text
   cairo_glyph_t *last_glyph = &glyphs.get()[num_glyphs - 1];
   cairo_text_extents_t extents;
   cairo_glyph_extents(cairo.get(), last_glyph, 1, &extents);
   if (cairo_status(cairo.get()))
-    unreachable("Failed to retrieve extents of the last glyph");
+    svg_unreachable("Failed to retrieve extents of the last glyph");
 
   x = last_glyph->x + extents.x_advance;
   y = last_glyph->y + extents.y_advance;
@@ -191,7 +191,7 @@ static double convertCSSLength(const CSSUnit &unit) {
   else if (unit.unit == CSSUnit::IN)
     len = unit.length * 90.;
   else
-    unreachable("Encountered unexpected css unit");
+    svg_unreachable("Encountered unexpected css unit");
   // cairo units are pt (= 1/72in)
   return len / 1.25;
 }

@@ -243,7 +243,7 @@ private:
   template <typename... args_t>
   constexpr void consume(const CliStorage<ValTy> &storage, args_t &&... args) {
     if (getPtr() && !std::holds_alternative<OwnedVal>(value))
-      unreachable("Multiple storage specifiers given");
+      svg_unreachable("Multiple storage specifiers given");
     OwnedVal prev(nullptr);
     if (std::holds_alternative<OwnedVal>(value))
       prev = std::move(std::get<OwnedVal>(value));
@@ -425,9 +425,9 @@ template <typename AppTag = void> struct ParseArgs {
           if (!res)
             bail(); // Error message is written by `parse()`
           if (0 > *res || *res > values.size())
-            unreachable("Illegal number of values read by option");
+            svg_unreachable("Illegal number of values read by option");
           if (*res == 0)
-            unreachable(
+            svg_unreachable(
                 "Failing to parse inline argument MUST result in std::nullopt");
           // Don't forget to clear!!!
           values.clear();
@@ -454,7 +454,7 @@ template <typename AppTag = void> struct ParseArgs {
         if (!res)
           bail(); // Error message is written by `parse()`
         if (0 > *res || *res > values.size())
-          unreachable("Illegal number of values read by option");
+          svg_unreachable("Illegal number of values read by option");
         for (size_t i = 0; i < *res; ++i)
           values.pop_front();
         positional.insert(positional.end(), values.begin(), values.end());
@@ -475,7 +475,7 @@ template <typename AppTag = void> struct ParseArgs {
       if (!res)
         bail();
       if (0 > *res || *res > positional.size())
-        unreachable("Illegal number of values read by option");
+        svg_unreachable("Illegal number of values read by option");
       if (*res != positional.size()) {
         std::cerr << "Too many positional arguments given:\n";
         for (auto It = positional.begin() + *res, End = positional.end();

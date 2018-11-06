@@ -22,7 +22,7 @@ struct Fontconfig {
   Pattern parsePattern(const char *str) const {
     FcPattern *p = FcNameParse(reinterpret_cast<const FcChar8 *>(str));
     if (!FcConfigSubstitute(config.get(), p, FcMatchPattern))
-      unreachable("Failed to substitute font pattern");
+      svg_unreachable("Failed to substitute font pattern");
     FcDefaultSubstitute(p);
     return Pattern(p, FcPatternDestroy);
   }

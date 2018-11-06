@@ -83,7 +83,7 @@ struct SVGAttributeVisitor {
     return static_cast<DerivedTy *>(this)->visit_##NAME(                       \
         static_cast<const NAME &>(attr));
 #include "svg_entities.def"
-    unreachable("Encountered unknown (foreign) attribute");
+    svg_unreachable("Encountered unknown (foreign) attribute");
   }
 #define SVG_ATTR(NAME, STR, DEFAULT)                                           \
   RetTy visit_##NAME(const NAME &) {                                           \
