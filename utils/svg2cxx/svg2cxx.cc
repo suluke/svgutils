@@ -7,8 +7,9 @@
 using namespace svg;
 namespace fs = std::filesystem;
 
-static cl::opt<fs::path> Infile{cl::meta("Input"), cl::required()};
+static cl::opt<fs::path> Infile(cl::meta("Input"), cl::required());
 static cl::opt<fs::path> Outfile(cl::name("o"), cl::required());
+static cl::opt<bool> Verbose(cl::name("v"), cl::init(false));
 
 static const char *TOOLNAME = "svg2cxx";
 static const char *TOOLDESC = "svg2cxx";
@@ -19,6 +20,8 @@ int main(int argc, const char **argv) {
     std::cerr << "Input file does not exist" << std::endl;
     return 1;
   }
+  if (Verbose)
+    std::cout << "Input: " << Infile << ", Output: " << Outfile << std::endl;
   std::fstream in(Infile->c_str(), in.in);
   std::fstream out(Outfile->c_str(), out.out);
   out << "#ifndef SVG\n"
