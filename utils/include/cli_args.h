@@ -3,8 +3,11 @@
 
 #include "svgutils/utils.h"
 
+#include <array>
 #include <cassert>
+#include <cctype>
 #include <charconv>
+#include <deque>
 #include <filesystem>
 #include <map>
 #include <memory>
@@ -104,16 +107,16 @@ template <typename ValTy> struct CliOpt {
     assert(getPtr() && "Casting cl::opt to value without initialization");
     return getPtr();
   }
-  /// Try to parse the given string_view to assign a value to this option.
+  /// Try to parse the given string_views to assign values to this option.
   /// Requires a matching specialization of the CliParseValue template
   /// function.
-  bool parse(std::string_view val) {
-    auto parsed = CliParseValue<ValTy>(val);
+  std::optional<size_t> parse(std::deque<std::string_view> &values,
+                              bool isInline = false) {
+    auto parsed = CliParseValue<ValTy>(values.front());
     if (!parsed)
-      return false;
-    *getPtr() = std::move(*parsed);
-    valueGiven = true;
-    return true;
+      return std::nullopt;
+    assign(std::move(*parsed));
+    return 1;
   }
   /// After all command line arguments have been processed, this function
   /// is used for checking that this option is in a valid state.
@@ -129,16 +132,8 @@ template <typename ValTy> struct CliOpt {
     }
     return true;
   }
-  /// The number of arguments this option consumes. For normal options,
-  /// this is 1. In contrast, boolean options have zero nargs, meaning
-  /// that a boolean option `-b` can only be set using just the flag
-  /// ('-b' -> b = true) or an immediate value following the flag with
-  /// an equals sign (e.g. `-b=true`, `-b=false`, `-b=on`, `-b=off`...)
-  int nargs() const { return 1; }
   /// Returns whether this is a required option or not.
-  bool required() const {
-    return Required;
-  }
+  bool required() const { return Required; }
   /// Prints a visual representation of this option to the specified
   /// stream @p os.
   void display(std::ostream &os) const {
@@ -185,6 +180,12 @@ private:
         value);
     return val;
   }
+
+  constexpr void assign(ValTy &&val) {
+    valueGiven = true;
+    *getPtr() = std::move(val);
+  }
+
   /// Overload to be called after all flags passed to the constructor
   /// have been `consume`d.
   constexpr void consume() {}
@@ -241,8 +242,6 @@ private:
   template <typename AppTag> static void registerWithApp(CliOpt<ValTy> &);
 };
 
-template <> int CliOpt<bool>::nargs() const { return 0; }
-
 // TODO
 //~ struct CliAlias {
 
@@ -261,9 +260,9 @@ template <> int CliOpt<bool>::nargs() const { return 0; }
 /// Interface for all types of options.
 struct CliOptConcept {
   virtual ~CliOptConcept() = default;
-  [[nodiscard]] virtual bool parse(std::string_view val) = 0;
+  [[nodiscard]] virtual std::optional<size_t>
+  parse(std::deque<std::string_view> &values, bool isInline = false) = 0;
   [[nodiscard]] virtual bool validate() const = 0;
-  [[nodiscard]] virtual int nargs() const = 0;
   [[nodiscard]] virtual bool required() const = 0;
   virtual void display(std::ostream &os) const = 0;
 
@@ -276,11 +275,11 @@ protected:
 /// OptTy object this model references.
 template <typename OptTy> struct CliOptModel : public CliOptConcept {
   CliOptModel(OptTy &opt) : opt(opt) {}
-  [[nodiscard]] bool parse(std::string_view val) override {
-    return opt.parse(val);
+  [[nodiscard]] std::optional<size_t>
+  parse(std::deque<std::string_view> &values, bool isInline = false) override {
+    return opt.parse(values, isInline);
   }
   [[nodiscard]] bool validate() const override { return opt.validate(); }
-  [[nodiscard]] int nargs() const override { return opt.nargs(); }
   [[nodiscard]] bool required() const override { return opt.required(); }
   void display(std::ostream &os) const override { opt.display(os); }
 
@@ -293,8 +292,12 @@ using name = CliName;
 using meta = CliMetaName;
 using desc = CliDesc;
 using required = CliRequired;
-template <typename T> using init = CliInit<T>;
-template <typename T> using storage = CliStorage<T>;
+template <typename T> CliInit<T> init(T &&val) {
+  return CliInit<T>(std::forward<T>(val));
+}
+template <typename T> CliStorage<T> storage(T &storage) {
+  return CliStorage(storage);
+}
 template <typename T> using opt = CliOpt<T>;
 
 /// Entry point to the cli_args library.
@@ -305,74 +308,95 @@ template <typename AppTag = void> struct ParseArgs {
   /// The parameter @p tool is the application's name and @p desc should
   /// contain a brief description of what the application does. Both
   /// these values are used by the help message.
-  ParseArgs(const char *tool, const char *desc, int argc, const char **argv) : tool(tool), desc(desc) {
-    OwnedOption &eatAll = options()[""];
-    int argNum = 1; // Skip executable name in argument parsing
+  ParseArgs(const char *tool, const char *desc, int argc, const char **argv)
+      : tool(tool), desc(desc) {
     bool verbatim = false;
-    for (; argNum < argc; ++argNum) {
+    std::deque<std::string_view> values;
+    std::deque<std::string_view> positional;
+    // =1: Skip executable name in argument parsing
+    for (int argNum = 1; argNum < argc; ++argNum) {
       std::string_view arg = argv[argNum];
       if (!verbatim && arg == "--") {
-        // treat all remaining arguments as verbatim
+        // Treat all remaining arguments as verbatim
         verbatim = true;
       } else if (!verbatim && arg.front() == '-' && arg.size() > 1) {
-        // we have an option
+        // We have an option. Do we know it?
         std::string_view name = parseOptName(arg);
         OwnedOption &opt = options()[name];
         if (!opt) {
           std::cerr << "Encountered unknown option " << arg << std::endl;
           bail();
         }
+        // Is the argument just the name or also an '=' assignment?
         if (auto prefixLen = &name.front() - &arg.front() + name.size();
             prefixLen < arg.size()) {
           std::string_view inlineVal =
               arg.substr(prefixLen + 1 /* equals sign */);
-          opt->parse(inlineVal);
+          values.push_back(inlineVal);
+          auto res = opt->parse(values, true);
+          if (!res)
+            bail(); // Error message is written by `parse()`
+          if (0 > *res || *res > values.size())
+            unreachable("Illegal number of values read by option");
+          if (*res == 0)
+            unreachable(
+                "Failing to parse inline argument MUST result in std::nullopt");
+          // Don't forget to clear!!!
+          values.clear();
           // The option ends after the inline value
           continue;
         }
-        int nargNum = 0, nargs = opt->nargs();
-        if (argNum + 1 == argc && nargNum < nargs) {
-          std::cerr << "Not enough values given for option ";
-          opt->display(std::cerr);
-          std::cerr << std::endl;
-          bail();
-        }
-        while (argNum + 1 < argc && nargNum < nargs) {
+        // Collect all arguments that could be values to the current option
+        while (argNum + 1 < argc) {
           arg = argv[argNum + 1];
-          if (arg == "--") {
-            verbatim = true;
-            continue;
-          } else if (!verbatim && arg.front() == '-' && arg.size() > 1) {
-            // '-'-prefixed values are still treated as flags
-            break;
+          if (!verbatim) {
+            if (arg == "--") {
+              verbatim = true;
+              ++argNum;
+              continue;
+            } else if (arg.front() == '-' && arg.size() > 1) {
+              // '-'-prefixed values are still treated as flags
+              break;
+            }
           }
           ++argNum;
-          ++nargNum;
-          opt->parse(arg);
+          values.push_back(arg);
         }
-        if (nargNum < nargs) {
-          std::cerr << "Not enough values given for option ";
-          opt->display(std::cerr);
-          std::cerr << std::endl;
-          bail();
-        }
-      } else {
-        // this must be a positional argument
-        if (!eatAll) {
-          std::cerr << "Too many positional arguments: " << arg << std::endl;
-          bail();
-        }
-        eatAll->parse(arg);
-      }
+        auto res = opt->parse(values);
+        if (!res)
+          bail(); // Error message is written by `parse()`
+        if (0 > *res || *res > values.size())
+          unreachable("Illegal number of values read by option");
+        for (size_t i = 0; i < *res; ++i)
+          values.pop_front();
+        positional.insert(positional.end(), values.begin(), values.end());
+        values.clear();
+      } else
+        positional.push_back(arg);
     }
-    for (; argNum < argc; ++argNum) {
-      std::string_view arg = argv[argNum];
+    // Parse positional arguments
+    if (positional.size()) {
+      OwnedOption &eatAll = options()[""];
       if (!eatAll) {
-        std::cerr << "Too many positional arguments: " << arg << std::endl;
+        std::cerr << "Too many positional arguments given:\n";
+        for (const auto &arg : positional)
+          std::cerr << arg << std::endl;
         bail();
       }
-      eatAll->parse(arg);
+      auto res = eatAll->parse(positional);
+      if (!res)
+        bail();
+      if (0 > *res || *res > positional.size())
+        unreachable("Illegal number of values read by option");
+      if (*res != positional.size()) {
+        std::cerr << "Too many positional arguments given:\n";
+        for (auto It = positional.begin() + *res, End = positional.end();
+             It != End; ++It)
+          std::cerr << *It << std::endl;
+        bail();
+      }
     }
+    // Check that all options are in a valid state
     bool allValid = true;
     for (const auto &KeyValuePair : options())
       if (KeyValuePair.second && !KeyValuePair.second->validate())
@@ -383,6 +407,7 @@ template <typename AppTag = void> struct ParseArgs {
 
   /// Prints a help message for this ParseArg instance.
   void printHelp() {
+    // FIXME this is still in MVP state
     std::cout << "usage: " << tool << " <OPTION>...";
     OwnedOption &eatAll = options()[""];
     if (eatAll) {
@@ -428,6 +453,8 @@ private:
   static optionmap_t &options();
   template <typename T> friend struct CliOpt;
 
+  /// Extract the name part of an option from a string, i.e.
+  /// everything between '-'/'--' and '='/the end of the string
   std::string_view parseOptName(std::string_view opt) {
     if (opt.front() == '-')
       opt = opt.substr(1);
@@ -459,6 +486,28 @@ void CliOpt<ValTy>::registerWithApp(CliOpt<ValTy> &opt) {
                                ParseArgs<>::OwnedOption(new CliOptModel(opt)));
 }
 
+/// Definition of CliParseValue<bool>
+template <> std::optional<bool> CliParseValue(std::string_view value) {
+  // All legal values fit in a 5 character array (yes,no,true,false,on,off)
+  if (value.size() > 5)
+    return std::nullopt;
+  std::array<char, 5> lower;
+  for (unsigned i = 0; i < value.size(); ++i)
+    lower[i] = std::tolower(value[i]);
+  std::string_view cmp(lower.begin(), value.size());
+  if (cmp == "true")
+    return true;
+  if (cmp == "false")
+    return false;
+  if (cmp == "on")
+    return true;
+  if (cmp == "off")
+    if (cmp == "yes")
+      return true;
+  if (cmp == "no")
+    return false;
+  return std::nullopt;
+}
 /// Definition of CliParseValue<std::string>
 template <> std::optional<std::string> CliParseValue(std::string_view value) {
   return std::string(value);
@@ -475,6 +524,27 @@ template <> std::optional<unsigned> CliParseValue(std::string_view value) {
   if (result.ptr != value.data() + value.size())
     return std::nullopt;
   return u;
+}
+
+/// We specialize option parsing for booleans since they should only be
+/// set implicitly (just the flag) or using an inline value
+template <>
+std::optional<size_t> CliOpt<bool>::parse(std::deque<std::string_view> &values,
+                                          bool isInline) {
+  if (values.empty() || (values.size() && !isInline)) {
+    assign(true);
+    return 0;
+  }
+  auto parsed = CliParseValue<bool>(values.front());
+  if (!parsed) {
+    std::cerr << "Could not parse boolean value for flag ";
+    display(std::cerr);
+    std::cerr << ": " << values.front() << std::endl;
+    return std::nullopt;
+  }
+  // Assign takes rvalue, so we need to be slightly stupid here
+  assign(*parsed && *parsed);
+  return 1;
 }
 } // namespace cl
 } // namespace svg
