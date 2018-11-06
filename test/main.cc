@@ -1,4 +1,4 @@
-#include "svgutils/jswriter.h"
+#include "svgutils/js_writer.h"
 #include "svgplotlib/plotlib.h"
 #include <string>
 

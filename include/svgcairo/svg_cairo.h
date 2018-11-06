@@ -1,7 +1,7 @@
 #ifndef SVGCAIRO_SVG_CAIRO_H
 #define SVGCAIRO_SVG_CAIRO_H
 
-#include "svgutils/svg_utils.h"
+#include "svgutils/svg_writer.h"
 #include "svgutils/css_utils.h"
 #include "svgcairo/freetype.h"
 

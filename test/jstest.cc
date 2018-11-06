@@ -1,4 +1,4 @@
-#include "svgutils/jswriter.h"
+#include "svgutils/js_writer.h"
 #include <iostream>
 // In this test we build a little js library to create svg documents.
 // We use a nifty feature of the SVGJSWriter for that.

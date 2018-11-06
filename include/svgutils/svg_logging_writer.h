@@ -1,7 +1,7 @@
 #ifndef SVGUTILS_SVG_LOGGING_WRITER_H
 #define SVGUTILS_SVG_LOGGING_WRITER_H
 
-#include "svgutils/svg_utils.h"
+#include "svgutils/svg_writer.h"
 
 namespace svg {
 

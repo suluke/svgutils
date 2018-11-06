@@ -1,5 +1,5 @@
 #include "svgutils/css_utils.h"
-#include "svgutils/svg_utils.h"
+#include "svgutils/svg_writer.h"
 
 #include <limits>
 

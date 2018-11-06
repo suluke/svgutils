@@ -1,4 +1,4 @@
-#include "svgutils/svg_utils.h"
+#include "svgutils/svg_writer.h"
 namespace svg {
 // Rationale for the NAME_name static member:
 // We need a way to unique attributes. It's a nice service to client code

@@ -2,7 +2,7 @@
 #define SVGPLOTLIB_PLOTLIB_CORE_H
 
 #include "svgutils/css_utils.h"
-#include "svgutils/svg_utils.h"
+#include "svgutils/svg_writer.h"
 #include <functional>
 #include <optional>
 #include <string_view>

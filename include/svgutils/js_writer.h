@@ -1,7 +1,7 @@
 #ifndef SVGUTILS_JSWRITER_H
 #define SVGUTILS_JSWRITER_H
 
-#include "svg_utils.h"
+#include "svg_writer.h"
 
 namespace svg {
 
