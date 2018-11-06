@@ -1,5 +1,5 @@
 #include "svgcairo/svg_cairo.h"
-#include "svgutils/plotlib_core.h"
+#include "svgplotlib/plotlib_core.h"
 
 void testCairo() {
   using namespace svg;

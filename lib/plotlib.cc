@@ -1,4 +1,4 @@
-#include "svgutils/plotlib.h"
+#include "svgplotlib/plotlib.h"
 #include <algorithm>
 #include <limits>
 

@@ -1,5 +1,5 @@
-#ifndef SVGUTILS_PLOTLIB_H
-#define SVGUTILS_PLOTLIB_H
+#ifndef SVGPLOTLIB_PLOTLIB_H
+#define SVGPLOTLIB_PLOTLIB_H
 
 #include "plotlib_core.h"
 
@@ -58,4 +58,4 @@ private:
 };
 
 } // namespace plots
-#endif // SVGUTILS_PLOTLIB_H
+#endif // SVGPLOTLIB_PLOTLIB_H

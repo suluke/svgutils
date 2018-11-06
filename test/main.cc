@@ -1,5 +1,5 @@
 #include "svgutils/jswriter.h"
-#include "svgutils/plotlib.h"
+#include "svgplotlib/plotlib.h"
 #include <string>
 
 template <typename WriterTy> void testSVG() {

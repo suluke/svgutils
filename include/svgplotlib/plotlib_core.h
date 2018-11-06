@@ -1,8 +1,8 @@
-#ifndef SVGUTILS_PLOTLIB_CORE_H
-#define SVGUTILS_PLOTLIB_CORE_H
+#ifndef SVGPLOTLIB_PLOTLIB_CORE_H
+#define SVGPLOTLIB_PLOTLIB_CORE_H
 
-#include "css_utils.h"
-#include "svg_utils.h"
+#include "svgutils/css_utils.h"
+#include "svgutils/svg_utils.h"
 #include <functional>
 #include <optional>
 #include <string_view>
@@ -268,4 +268,4 @@ private:
 };
 
 } // namespace plots
-#endif // SVGUTILS_PLOTLIB_CORE_H
+#endif // SVGPLOTLIB_PLOTLIB_CORE_H

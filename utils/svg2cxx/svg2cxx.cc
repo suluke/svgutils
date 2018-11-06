@@ -12,7 +12,7 @@ static cl::opt<fs::path> Outfile(cl::name("o"), cl::required());
 static cl::opt<bool> Verbose(cl::name("v"), cl::init(false));
 
 static const char *TOOLNAME = "svg2cxx";
-static const char *TOOLDESC = "svg2cxx";
+static const char *TOOLDESC = "Convert SVG documents to header files to be used from C++";
 
 int main(int argc, const char **argv) {
   cl::ParseArgs(TOOLNAME, TOOLDESC, argc, argv);
