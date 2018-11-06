@@ -14,6 +14,7 @@
 #include <optional>
 #include <string_view>
 #include <variant>
+#include <vector>
 
 namespace svg {
 namespace cl {
@@ -28,7 +29,7 @@ struct CliName {
   constexpr CliName(std::string_view name) : name(name) {}
 
 private:
-  template <typename T> friend struct CliOpt;
+  template <typename T, typename U> friend struct CliOptBase;
   std::string_view name;
 };
 
@@ -38,7 +39,7 @@ struct CliMetaName {
   constexpr CliMetaName(std::string_view name) : name(name) {}
 
 private:
-  template <typename T> friend struct CliOpt;
+  template <typename T, typename U> friend struct CliOptBase;
   std::string_view name;
 };
 
@@ -48,7 +49,7 @@ struct CliDesc {
   constexpr CliDesc(std::string_view desc) : desc(desc) {}
 
 private:
-  template <typename T> friend struct CliOpt;
+  template <typename T, typename U> friend struct CliOptBase;
   std::string_view desc;
 };
 
@@ -85,38 +86,30 @@ struct CliRequired {};
 /// provide their own specializations.
 template <typename T> std::optional<T> CliParseValue(std::string_view value);
 
-/// Implementation of a single-value command line option.
-template <typename ValTy> struct CliOpt {
-  template <typename... args_t> constexpr CliOpt(args_t &&... args) {
-    consume(std::forward<args_t>(args)...);
-    if (!getPtr())
-      value = OwnedVal(new ValTy);
-    if (!registrator)
-      registrator = &registerWithApp<void>;
-    registrator(*this);
-  }
+/// Common functionality for command line options
+template <typename DerivedTy, typename DecayTy> struct CliOptBase {
   /// Automatic conversion to the option's underlying value.
-  operator ValTy &() const {
-    ValTy *val = getPtr();
-    assert(val && "Failed to find value");
-    return *val;
+  constexpr operator DecayTy &() const {
+    DecayTy *ptr = static_cast<const DerivedTy *>(this)->getPtr();
+    assert(ptr && "Casting option to underlying type without initialization");
+    return *ptr;
   }
   /// Use the dereference (->) operator in cases where implicit conversion
-  /// to ValTy fails, i.e. in member lookups.
-  ValTy *operator->() {
-    assert(getPtr() && "Casting cl::opt to value without initialization");
-    return getPtr();
+  /// to ValContainer fails, i.e. in member lookups.
+  constexpr DecayTy *operator->() {
+    DecayTy *ptr = static_cast<DerivedTy *>(this)->getPtr();
+    assert(ptr && "Casting option to underlying type without initialization");
+    return ptr;
   }
-  /// Try to parse the given string_views to assign values to this option.
-  /// Requires a matching specialization of the CliParseValue template
-  /// function.
-  std::optional<size_t> parse(std::deque<std::string_view> &values,
-                              bool isInline = false) {
-    auto parsed = CliParseValue<ValTy>(values.front());
-    if (!parsed)
-      return std::nullopt;
-    assign(std::move(*parsed));
-    return 1;
+  /// Returns whether this is a required option or not.
+  constexpr bool required() const { return Required; }
+  /// Prints a visual representation of this option to the specified
+  /// stream @p os.
+  void display(std::ostream &os) const {
+    if (name.size())
+      os << "-" << name;
+    else
+      os << meta;
   }
   /// After all command line arguments have been processed, this function
   /// is used for checking that this option is in a valid state.
@@ -132,15 +125,87 @@ template <typename ValTy> struct CliOpt {
     }
     return true;
   }
-  /// Returns whether this is a required option or not.
-  bool required() const { return Required; }
-  /// Prints a visual representation of this option to the specified
-  /// stream @p os.
-  void display(std::ostream &os) const {
-    if (name.size())
-      os << "-" << name;
-    else
-      os << meta;
+
+protected:
+  /// Registration is performed dynamically after all configuration flags
+  /// passed to the constructor have been evaluated. It is possible to
+  /// register with a different AppTag, so the registration function
+  /// needs to be changeable.
+  using RegistrationCB = void (*)(DerivedTy &);
+  RegistrationCB registrator = nullptr;
+  std::string_view name = "";
+  std::string_view meta = "";
+  std::string_view desc = "";
+  bool Required = false;
+  bool valueGiven = false;
+
+  /// Static function to be used for registering a CliOpt with a
+  /// ParseArg with a given AppTag. Definition follows further below
+  /// after ParseArg has been defined.
+  template <typename AppTag> static void registerWithApp(DerivedTy &);
+
+  /// Overload to be called after all flags passed to the constructor
+  /// have been `consume`d.
+  constexpr void consume() {}
+
+  template <typename... args_t>
+  constexpr void consume(const CliName &name, args_t &&... args) {
+    this->name = name.name;
+    static_cast<DerivedTy *>(this)->consume(std::forward<args_t>(args)...);
+  }
+  template <typename... args_t>
+  constexpr void consume(const CliMetaName &name, args_t &&... args) {
+    meta = name.name;
+    static_cast<DerivedTy *>(this)->consume(std::forward<args_t>(args)...);
+  }
+  template <typename... args_t>
+  constexpr void consume(const CliDesc &desc, args_t &&... args) {
+    this->desc = desc.desc;
+    static_cast<DerivedTy *>(this)->consume(std::forward<args_t>(args)...);
+  }
+  template <typename AppTag, typename... args_t>
+  constexpr void consume(const CliAppTag<AppTag> &tag, args_t &&... args) {
+    assert(!registrator && "Must not register with more than one app tag");
+    registrator = &registerWithApp<AppTag>;
+    static_cast<DerivedTy *>(this)->consume(std::forward<args_t>(args)...);
+  }
+  template <typename... args_t>
+  constexpr void consume(const CliRequired &, args_t &&... args) {
+    Required = true;
+    static_cast<DerivedTy *>(this)->consume(std::forward<args_t>(args)...);
+  }
+};
+
+/// Implementation of a single-value command line option.
+template <typename ValTy>
+struct CliOpt : public CliOptBase<CliOpt<ValTy>, ValTy> {
+  using DecayTy = ValTy;
+  using base_t = CliOptBase<CliOpt<ValTy>, DecayTy>;
+  friend base_t;
+
+  template <typename... args_t> constexpr CliOpt(args_t &&... args) {
+    consume(std::forward<args_t>(args)...);
+    if (!getPtr())
+      value = OwnedVal(new ValTy);
+    if (!base_t::registrator)
+      base_t::registrator = &base_t::template registerWithApp<void>;
+    base_t::registrator(*this);
+  }
+
+  /// Import conversion operators from base_t
+  using base_t::operator DecayTy &;
+  using base_t::operator->;
+
+  /// Try to parse the given string_views to assign values to this option.
+  /// Requires a matching specialization of the CliParseValue template
+  /// function.
+  std::optional<size_t> parse(std::deque<std::string_view> &values,
+                              bool isInline = false) {
+    auto parsed = CliParseValue<ValTy>(values.front());
+    if (!parsed)
+      return std::nullopt;
+    assign(std::move(*parsed));
+    return 1;
   }
 
 private:
@@ -151,17 +216,6 @@ private:
   /// same size as ValTy, i.e. taking twice as much storage as ValTy
   using OwnedVal = std::unique_ptr<ValTy>;
   std::variant<ValTy *, OwnedVal> value = nullptr;
-  /// Registration is performed dynamically after all configuration flags
-  /// passed to the constructor have been evaluated. It is possible to
-  /// register with a different AppTag, so the registration function
-  /// needs to be changeable.
-  using RegistrationCB = void (*)(CliOpt<ValTy> &);
-  RegistrationCB registrator = nullptr;
-  std::string_view name = "";
-  std::string_view meta = "";
-  std::string_view desc = "";
-  bool Required = false;
-  bool valueGiven = false;
 
   /// Returns the storage location of this option. During option
   /// initialization this function can return nullptr. However, after
@@ -182,35 +236,10 @@ private:
   }
 
   constexpr void assign(ValTy &&val) {
-    valueGiven = true;
+    base_t::valueGiven = true;
     *getPtr() = std::move(val);
   }
 
-  /// Overload to be called after all flags passed to the constructor
-  /// have been `consume`d.
-  constexpr void consume() {}
-
-  template <typename... args_t>
-  constexpr void consume(const CliName &name, args_t &&... args) {
-    this->name = name.name;
-    consume(std::forward<args_t>(args)...);
-  }
-  template <typename... args_t>
-  constexpr void consume(const CliMetaName &name, args_t &&... args) {
-    this->meta = name.name;
-    consume(std::forward<args_t>(args)...);
-  }
-  template <typename... args_t>
-  constexpr void consume(const CliDesc &desc, args_t &&... args) {
-    this->desc = desc.desc;
-    consume(std::forward<args_t>(args)...);
-  }
-  template <typename AppTag, typename... args_t>
-  constexpr void consume(const CliAppTag<AppTag> &tag, args_t &&... args) {
-    assert(!registrator && "Must not register with more than one app tag");
-    registrator = &registerWithApp<AppTag>;
-    consume(std::forward<args_t>(args)...);
-  }
   template <typename... args_t>
   constexpr void consume(const CliStorage<ValTy> &storage, args_t &&... args) {
     if (getPtr() && !std::holds_alternative<OwnedVal>(value))
@@ -231,15 +260,8 @@ private:
       *getPtr() = init.val;
     consume(std::forward<args_t>(args)...);
   }
-  template <typename... args_t>
-  constexpr void consume(const CliRequired &, args_t &&... args) {
-    Required = true;
-    consume(std::forward<args_t>(args)...);
-  }
-  /// Static function to be used for registering a CliOpt with a
-  /// ParseArg with a given AppTag. Definition follows further below
-  /// after ParseArg has been defined.
-  template <typename AppTag> static void registerWithApp(CliOpt<ValTy> &);
+  /// Import `consume` implementations from base_t
+  using base_t::consume;
 };
 
 // TODO
@@ -247,15 +269,80 @@ private:
 
 //~ };
 
-//~ template<typename ValTy>
-//~ struct CliList {
+/// Implementation of a multi-value command line option
+template <typename ValTy>
+struct CliList : public CliOptBase<CliList<ValTy>, std::vector<ValTy>> {
+  using ValContainer = std::vector<ValTy>;
+  using DecayTy = ValContainer;
+  using base_t = CliOptBase<CliList<ValTy>, DecayTy>;
+  friend base_t;
 
-//~ template<typename... args_t>
-//~ CliList(args_t &&... args) {
+  template <typename... args_t> constexpr CliList(args_t &&... args) {
+    consume(std::forward<args_t>(args)...);
+    if (!getPtr())
+      list = OwnedContainer(new ValContainer);
+    if (!base_t::registrator)
+      base_t::registrator = &base_t::template registerWithApp<void>;
+    base_t::registrator(*this);
+  }
 
-//~ }
+  /// Import conversion operators from base_t
+  using base_t::operator DecayTy &;
+  using base_t::operator->;
 
-//~ };
+  /// Try to parse the given string_views to assign values to this option.
+  /// Requires a matching specialization of the CliParseValue template
+  /// function.
+  std::optional<size_t> parse(std::deque<std::string_view> &values,
+                              bool isInline = false) {
+    for (const auto &val : values) {
+      auto parsed = CliParseValue<ValTy>(val);
+      if (!parsed) {
+        clear();
+        return std::nullopt;
+      }
+      insert(std::move(*parsed));
+    }
+    return values.size();
+  }
+  auto begin() const {
+    ValContainer *ptr = getPtr();
+    assert(ptr && "Tried to iterate over cl::list prior to initialization");
+    return ptr->begin();
+  }
+  auto end() const {
+    ValContainer *ptr = getPtr();
+    assert(ptr && "Tried to iterate over cl::list prior to initialization");
+    return ptr->end();
+  }
+
+private:
+  using OwnedContainer = std::unique_ptr<ValContainer>;
+  std::variant<ValContainer *, OwnedContainer> list = nullptr;
+
+  void insert(ValTy &&val) {
+    base_t::valueGiven = true;
+    getPtr()->emplace_back(std::move(val));
+  }
+  void clear() { getPtr()->clear(); }
+
+  constexpr ValContainer *getPtr() const {
+    ValContainer *res = nullptr;
+    std::visit(
+        [&res](auto &&value) {
+          using T = std::decay_t<decltype(value)>;
+          if constexpr (std::is_same_v<T, ValContainer *>)
+            res = value;
+          else
+            res = value.get();
+        },
+        list);
+    return res;
+  }
+
+  /// Import `consume` implementations from base_t
+  using base_t::consume;
+};
 
 /// Interface for all types of options.
 struct CliOptConcept {
@@ -299,6 +386,7 @@ template <typename T> CliStorage<T> storage(T &storage) {
   return CliStorage(storage);
 }
 template <typename T> using opt = CliOpt<T>;
+template <typename T> using list = CliList<T>;
 
 /// Entry point to the cli_args library.
 template <typename AppTag = void> struct ParseArgs {
@@ -479,9 +567,9 @@ ParseArgs<>::optionmap_t &ParseArgs<AppTag>::options() {
   return opts;
 }
 
-template <typename ValTy>
+template <typename DerivedTy, typename DecayTy>
 template <typename AppTag>
-void CliOpt<ValTy>::registerWithApp(CliOpt<ValTy> &opt) {
+void CliOptBase<DerivedTy, DecayTy>::registerWithApp(DerivedTy &opt) {
   ParseArgs<AppTag>::addOption(opt.name,
                                ParseArgs<>::OwnedOption(new CliOptModel(opt)));
 }
