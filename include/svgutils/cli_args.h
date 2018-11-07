@@ -252,10 +252,10 @@ private:
       *storage.val = *prev;
     consume(std::forward<args_t>(args)...);
   }
-  template <typename... args_t>
-  constexpr void consume(const CliInit<ValTy> &init, args_t &&... args) {
+  template <typename T, typename... args_t>
+  constexpr void consume(const CliInit<T> &init, args_t &&... args) {
     if (!getPtr())
-      value = OwnedVal(new ValTy(init.val));
+      value = OwnedVal(new ValTy(static_cast<const ValTy &>(init.val)));
     else
       *getPtr() = init.val;
     consume(std::forward<args_t>(args)...);
