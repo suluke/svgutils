@@ -16,8 +16,8 @@ static cl::opt<unsigned> Height(cl::name("h"), cl::init(0));
 static cl::opt<unsigned> DefaultWidth(cl::name("W"), cl::init(300));
 static cl::opt<unsigned> DefaultHeight(cl::name("H"), cl::init(200));
 
-static const char *TOOLNAME = "svg2pdf";
-static const char *TOOLDESC = "Convert SVG documents to PDF files";
+static const char *TOOLNAME = "svg2png";
+static const char *TOOLDESC = "Convert SVG documents to PNG images";
 
 int main(int argc, const char **argv) {
   cl::ParseArgs(TOOLNAME, TOOLDESC, argc, argv);
@@ -27,17 +27,17 @@ int main(int argc, const char **argv) {
   }
   std::fstream in(Infile->c_str(), in.in);
   if (!Width && !Height) {
-    SVGReaderWriter<CairoSVGWriter> Reader(Outfile, CairoSVGWriter::PDF);
+    SVGReaderWriter<CairoSVGWriter> Reader(Outfile, CairoSVGWriter::PNG);
     CairoSVGWriter &cairo = Reader.getWriter();
     cairo.setDefaultWidth(DefaultWidth);
     cairo.setDefaultHeight(DefaultHeight);
     Reader.parse(in);
   } else {
     if (!Width || !Height) {
-      std::cerr << "PDF dimension zero or not set" << std::endl;
+      std::cerr << "PNG dimension zero or not set" << std::endl;
       return 1;
     }
-    SVGReaderWriter<CairoSVGWriter> Reader(Outfile, CairoSVGWriter::PDF, Width, Height);
+    SVGReaderWriter<CairoSVGWriter> Reader(Outfile, CairoSVGWriter::PNG, Width, Height);
     Reader.parse(in);
   }
   return 0;
