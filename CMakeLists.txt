@@ -46,6 +46,8 @@ if (SVG_UTILS_WITH_CAIRO)
   add_svgutils_test(cairotest test/cairotest.cc)
 endif()
 
+add_subdirectory(tools)
+
 # Check and update source code formatting
 file(GLOB_RECURSE CHECK_FORMAT_SOURCES
   include/svgutils/*.h
