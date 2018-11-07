@@ -291,6 +291,7 @@ template <typename WriterTy> struct WriterModel : public virtual WriterConcept {
   void leave() override { Writer.leave(); }
   void content(const char *text) override { Writer.content(text); }
   void finish() override { Writer.finish(); }
+  WriterTy &getWriter() { return Writer; }
 
 protected:
   WriterTy Writer;

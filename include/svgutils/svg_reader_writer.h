@@ -51,6 +51,8 @@ struct SVGReaderWriter : public SVGReaderWriterBase {
   SVGReaderWriter(args_t &&... args)
       : base_t(writer), writer(std::forward<args_t>(args)...) {}
 
+  WriterTy &getWriter() { return writer.getWriter(); }
+
 private:
   WriterModel<WriterTy> writer;
 };
