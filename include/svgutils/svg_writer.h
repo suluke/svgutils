@@ -141,28 +141,26 @@ public:
     return *static_cast<DerivedTy *>(this);
   }
 
-private:
-  using attrmap_t = std::map<const char *, SVGAttribute>;
-  void uniqueAttrs(attrmap_t &attrMap) {}
-  template <typename... attrs_t>
-  void uniqueAttrs(attrmap_t &attrMap, const SVGAttribute &attr,
-                   attrs_t... attrs) {
-    attrMap.insert_or_assign(attr.getName(), attr);
-    uniqueAttrs(attrMap, std::forward<attrs_t>(attrs)...);
-  }
-
 protected:
   template <typename container_t> void writeAttrs(const container_t &attrs) {
+    std::map<const char *, int> repetitions;
     for (const auto &attr : attrs)
-      output() << " " << attr;
+      if (repetitions.count(attr.getName()))
+        repetitions[attr.getName()] += 1;
+      else
+        repetitions[attr.getName()] = 1;
+    for (const auto &attr : attrs) {
+      int &remaining = repetitions[attr.getName()];
+      assert(remaining != 0);
+      if (remaining == 1)
+        output() << " " << attr;
+      else
+        --remaining;
+    }
   }
   template <typename... attrs_t>
   void openTag(const char *tagname, attrs_t... attrs) {
-    attrmap_t attrMap;
-    uniqueAttrs(attrMap, std::forward<attrs_t>(attrs)...);
-    std::vector<SVGAttribute> attrVec;
-    for (const auto &KeyValuePair : attrMap)
-      attrVec.emplace_back(KeyValuePair.second);
+    std::vector<SVGAttribute> attrVec({std::forward<attrs_t>(attrs)...});
     static_cast<DerivedTy *>(this)->openTag(tagname, attrVec);
   }
 
@@ -205,21 +203,21 @@ struct SVGFormattedWriter : public SVGWriterBase<SVGFormattedWriter> {
       : base_t(os), indentChar(indentChar), indentWidth(indentWidth) {}
 
   self_t &enter() {
-    this->base_t::enter();
-    this->base_t::output() << "\n";
+    base_t::enter();
+    base_t::output() << "\n";
     ++indent;
     wasEntered.top() = true;
     return *this;
   }
   self_t &leave() {
-    this->base_t::leave();
+    base_t::leave();
     --indent;
     return *this;
   }
   self_t &content(const char *text) {
     closeTag();
     writeIndent();
-    this->base_t::output() << text << "\n";
+    base_t::output() << text << "\n";
     return *this;
   }
 
@@ -230,7 +228,7 @@ private:
     return os;
   }
   void writeIndent() {
-    repeat(this->base_t::output(), indentChar, indentWidth * indent);
+    repeat(base_t::output(), indentChar, indentWidth * indent);
   }
 
   friend base_t;
@@ -238,19 +236,19 @@ private:
   void openTag(const char *tagname, container_t attrs) {
     closeTag();
     writeIndent();
-    this->base_t::output() << "<" << tagname;
-    this->base_t::writeAttrs(attrs);
-    this->base_t::output() << ">";
-    this->base_t::currentTag = tagname;
+    base_t::output() << "<" << tagname;
+    base_t::writeAttrs(attrs);
+    base_t::output() << ">";
+    base_t::currentTag = tagname;
     wasEntered.push(false);
   }
   void closeTag() {
-    if (this->base_t::currentTag) {
+    if (base_t::currentTag) {
       if (wasEntered.top())
         writeIndent();
-      this->base_t::output() << "</" << this->base_t::currentTag << ">";
-      this->base_t::currentTag = nullptr;
-      this->base_t::output() << "\n";
+      base_t::output() << "</" << base_t::currentTag << ">";
+      base_t::currentTag = nullptr;
+      base_t::output() << "\n";
       wasEntered.pop();
     }
   }
