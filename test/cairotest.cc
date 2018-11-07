@@ -4,7 +4,7 @@
 void testCairo() {
   using namespace svg;
   using WriterTy = CairoSVGWriter;
-  WriterTy writer("test.pdf", 300., 200.);
+  WriterTy writer("test.pdf", WriterTy::PDF, 300., 200.);
   // We can use containers to pass attributes as well
   std::vector<SVGAttribute> rectAttrs(
       {width("100%"), height("100%"), fill("red")});

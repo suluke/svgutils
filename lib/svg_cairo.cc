@@ -20,19 +20,41 @@ enum class CairoSVGWriter::TagType {
 #include "svgutils/svg_entities.def"
 };
 
-CairoSVGWriter::CairoSVGWriter(const fs::path &outfile, double width,
-                               double height)
-    : currentTag(TagType::NONE),
-      fonts(/*FIXME proper checking of optional*/ *Freetype::Create()),
-      surface(cairo_pdf_surface_create(outfile.c_str(), width / 1.25,
-                                       height / 1.25),
-              cairo_surface_destroy),
-      cairo(cairo_create(surface.get()), cairo_deleter), width(width / 1.25),
-      height(height / 1.25) {
+void CairoSVGWriter::initCairo() {
+  double w = width ? width : dfltWidth;
+  double h = height ? height : dfltHeight;
+  switch (fmt) {
+  case CairoSVGWriter::PDF:
+    surface = OwnedSurface(
+        cairo_pdf_surface_create(outfile.c_str(), w / 1.25, h / 1.25),
+        cairo_surface_destroy);
+    break;
+  case CairoSVGWriter::PNG:
+    surface =
+        OwnedSurface(cairo_image_surface_create(CAIRO_FORMAT_ARGB32, w, h),
+                     cairo_surface_destroy);
+    break;
+  };
   assert(cairo_surface_status(surface.get()) == CAIRO_STATUS_SUCCESS &&
          "Error initializing cairo pdf surface");
+  cairo = OwnedCairo(cairo_create(surface.get()), cairo_deleter);
   assert(cairo_status(cairo.get()) == CAIRO_STATUS_SUCCESS &&
          "Error initializing cairo context");
+}
+
+CairoSVGWriter::CairoSVGWriter(const fs::path &outfile, OutputFormat fmt)
+    : outfile(outfile), fmt(fmt),
+      fonts(/*FIXME proper checking of optional*/ *Freetype::Create()),
+      currentTag(TagType::NONE) {
+  initCairo();
+}
+
+CairoSVGWriter::CairoSVGWriter(const fs::path &outfile, OutputFormat fmt,
+                               double width, double height)
+    : outfile(outfile), fmt(fmt),
+      fonts(/*FIXME proper checking of optional*/ *Freetype::Create()),
+      width(width), height(height), currentTag(TagType::NONE) {
+  initCairo();
 }
 
 CairoSVGWriter &CairoSVGWriter::content(const char *text) {
@@ -148,7 +170,14 @@ CairoSVGWriter &CairoSVGWriter::finish() {
   while (parents.size())
     leave();
   closeTag();
-  cairo_show_page(cairo.get());
+  switch (fmt) {
+  case PDF:
+    cairo_show_page(cairo.get());
+    break;
+  case PNG:
+    cairo_surface_write_to_png(surface.get(), outfile.c_str());
+    break;
+  }
   return *this;
 }
 
@@ -171,45 +200,58 @@ void CairoSVGWriter::closeTag() {
 
 void CairoSVGWriter::openTag(TagType T,
                              const CairoSVGWriter::AttrContainer &attrs) {
+  if (!width && !height) {
+    width = dfltWidth;
+    height = dfltHeight;
+  }
   closeTag();
   currentTag = T;
   styles.push(attrs);
 }
 
-static double convertCSSLength(const CSSUnit &unit) {
-  double len = 0;
+static double convertCSSLength(const CSSUnit &unit,
+                               CairoSVGWriter::OutputFormat fmt) {
+  double len = unit.length;
   if (unit.unit == CSSUnit::PX)
-    len = unit.length;
+    len = len;
   else if (unit.unit == CSSUnit::PT)
-    len = unit.length * 1.25;
+    len *= 1.25;
   else if (unit.unit == CSSUnit::PC)
-    len = unit.length * 15.;
+    len *= 15.;
   else if (unit.unit == CSSUnit::MM)
-    len = unit.length * 3.543307;
+    len *= 3.543307;
   else if (unit.unit == CSSUnit::CM)
-    len = unit.length * 35.43307;
+    len *= 35.43307;
   else if (unit.unit == CSSUnit::IN)
-    len = unit.length * 90.;
+    len *= 90.;
   else
     svg_unreachable("Encountered unexpected css unit");
-  // cairo units are pt (= 1/72in)
-  return len / 1.25;
+  switch (fmt) {
+  case CairoSVGWriter::PDF:
+    // cairo pdf units are pt (= 1/72in)
+    len /= 1.25;
+    break;
+  case CairoSVGWriter::PNG:
+    break;
+  };
+
+  return len;
 }
 
 double CairoSVGWriter::convertCSSWidth(const CSSUnit &unit) const {
   if (unit.unit == CSSUnit::PERCENT)
-    return unit.length / 100. * width;
-  return convertCSSLength(unit);
+    return unit.length / 100. * getWidth();
+  return convertCSSLength(unit, fmt);
 }
 double CairoSVGWriter::convertCSSHeight(const CSSUnit &unit) const {
   if (unit.unit == CSSUnit::PERCENT)
-    return unit.length / 100. * height;
-  return convertCSSLength(unit);
+    return unit.length / 100. * getHeight();
+  return convertCSSLength(unit, fmt);
 }
 
 /// Utility function to extract a CSS unit from the value of an
 /// SVGAttribute
-static CSSUnit extractUnitFrom(const SVGAttribute &attr) {
+static CSSUnit CSSUnitFrom(const SVGAttribute &attr) {
   if (const char *cstr = attr.cstrOrNull())
     return CSSUnit::parse(cstr);
   CSSUnit res;
@@ -262,9 +304,9 @@ CairoSVGWriter::circle(const CairoSVGWriter::AttrContainer &attrs) {
   CSSUnit cx, cy, r;
   struct AttrParser : public SVGAttributeVisitor<AttrParser> {
     AttrParser(CSSUnit &cx, CSSUnit &cy, CSSUnit &r) : cx(cx), cy(cy), r(r) {}
-    void visit_cx(const svg::cx &x) { cx = extractUnitFrom(x); }
-    void visit_cy(const svg::cy &y) { cy = extractUnitFrom(y); }
-    void visit_r(const svg::r &radius) { r = extractUnitFrom(radius); }
+    void visit_cx(const svg::cx &x) { cx = CSSUnitFrom(x); }
+    void visit_cy(const svg::cy &y) { cy = CSSUnitFrom(y); }
+    void visit_r(const svg::r &radius) { r = CSSUnitFrom(radius); }
     CSSUnit &cx;
     CSSUnit &cy;
     CSSUnit &r;
@@ -519,10 +561,10 @@ CairoSVGWriter::line(const CairoSVGWriter::AttrContainer &attrs) {
   struct AttrParser : public SVGAttributeVisitor<AttrParser> {
     AttrParser(CSSUnit &x1, CSSUnit &y1, CSSUnit &x2, CSSUnit &y2)
         : x1(x1), y1(y1), x2(x2), y2(y2) {}
-    void visit_x1(const svg::x1 &x) { x1 = extractUnitFrom(x); }
-    void visit_y1(const svg::y1 &y) { y1 = extractUnitFrom(y); }
-    void visit_x2(const svg::x2 &x) { x2 = extractUnitFrom(x); }
-    void visit_y2(const svg::y2 &y) { y2 = extractUnitFrom(y); }
+    void visit_x1(const svg::x1 &x) { x1 = CSSUnitFrom(x); }
+    void visit_y1(const svg::y1 &y) { y1 = CSSUnitFrom(y); }
+    void visit_x2(const svg::x2 &x) { x2 = CSSUnitFrom(x); }
+    void visit_y2(const svg::y2 &y) { y2 = CSSUnitFrom(y); }
     CSSUnit &x1;
     CSSUnit &y1;
     CSSUnit &x2;
@@ -627,10 +669,10 @@ CairoSVGWriter::rect(const CairoSVGWriter::AttrContainer &attrs) {
   struct AttrParser : public SVGAttributeVisitor<AttrParser> {
     AttrParser(CSSUnit &x, CSSUnit &y, CSSUnit &width, CSSUnit &height)
         : x(x), y(y), width(width), height(height) {}
-    void visit_x(const svg::x &xAttr) { x = extractUnitFrom(xAttr); }
-    void visit_y(const svg::y &yAttr) { y = extractUnitFrom(yAttr); }
-    void visit_width(const svg::width &w) { width = extractUnitFrom(w); }
-    void visit_height(const svg::height &h) { height = extractUnitFrom(h); }
+    void visit_x(const svg::x &xAttr) { x = CSSUnitFrom(xAttr); }
+    void visit_y(const svg::y &yAttr) { y = CSSUnitFrom(yAttr); }
+    void visit_width(const svg::width &w) { width = CSSUnitFrom(w); }
+    void visit_height(const svg::height &h) { height = CSSUnitFrom(h); }
     CSSUnit &x;
     CSSUnit &y;
     CSSUnit &width;
@@ -672,6 +714,37 @@ CairoSVGWriter::style(const CairoSVGWriter::AttrContainer &attrs) {
 }
 CairoSVGWriter &
 CairoSVGWriter::svg(const CairoSVGWriter::AttrContainer &attrs) {
+  if (!width && !height) {
+    // We're allowed to read the document dimension from the svg tag.
+    // If this isn't possible, fall back to defaults __and do not try again__.
+    CSSUnit w, h;
+    struct DimFinder : public SVGAttributeVisitor<DimFinder> {
+      DimFinder(CSSUnit &w, CSSUnit &h) : w(w), h(h) {}
+      void visit_width(const svg::width &width) { w = CSSUnitFrom(width); }
+      void visit_height(const svg::height &height) { h = CSSUnitFrom(height); }
+      CSSUnit &w;
+      CSSUnit &h;
+    } findDims(w, h);
+    for (const SVGAttribute &attr : attrs)
+      findDims.visit(attr);
+    if (!w.length && !h.length) {
+      width = dfltWidth;
+      height = dfltHeight;
+    } else {
+      if (w.unit == CSSUnit::PERCENT)
+        width = w.length / 100 * getWidth();
+      else
+        width =
+            convertCSSLength(w, PNG); // Use any format that uses px as units
+      if (h.unit == CSSUnit::PERCENT)
+        height = h.length / 100 * getHeight();
+      else
+        height =
+            convertCSSLength(h, PNG); // Use any format that uses px as units
+    }
+    // Default dimensions might have changed, so re-init Cairo
+    initCairo();
+  }
   openTag(TagType::svg, attrs);
   cairo_push_group(cairo.get());
   return *this;
@@ -692,8 +765,8 @@ CairoSVGWriter::text(const CairoSVGWriter::AttrContainer &attrs) {
   CSSUnit x, y;
   struct AttrParser : public SVGAttributeVisitor<AttrParser> {
     AttrParser(CSSUnit &x, CSSUnit &y) : x(x), y(y) {}
-    void visit_x(const svg::x &xAttr) { x = extractUnitFrom(xAttr); }
-    void visit_y(const svg::y &yAttr) { y = extractUnitFrom(yAttr); }
+    void visit_x(const svg::x &xAttr) { x = CSSUnitFrom(xAttr); }
+    void visit_y(const svg::y &yAttr) { y = CSSUnitFrom(yAttr); }
     CSSUnit &x;
     CSSUnit &y;
   } attrParser(x, y);

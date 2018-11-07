@@ -11,6 +11,10 @@ namespace fs = std::filesystem;
 static cl::opt<fs::path> Infile(cl::meta("Input"), cl::required());
 static cl::opt<fs::path> Outfile(cl::name("o"), cl::required());
 static cl::opt<bool> Verbose(cl::name("v"), cl::init(false));
+static cl::opt<unsigned> Width(cl::name("w"), cl::init(0));
+static cl::opt<unsigned> Height(cl::name("h"), cl::init(0));
+static cl::opt<unsigned> DefaultWidth(cl::name("W"), cl::init(300));
+static cl::opt<unsigned> DefaultHeight(cl::name("H"), cl::init(200));
 
 static const char *TOOLNAME = "svg2pdf";
 static const char *TOOLDESC = "Convert SVG documents to PDF files";
@@ -22,7 +26,15 @@ int main(int argc, const char **argv) {
     return 1;
   }
   std::fstream in(Infile->c_str(), in.in);
-  SVGReaderWriter<CairoSVGWriter> Reader(Outfile, 300, 200);
-  Reader.parse(in);
+  if (!Width && !Height) {
+    SVGReaderWriter<CairoSVGWriter> Reader(Outfile, CairoSVGWriter::PDF);
+    CairoSVGWriter &cairo = Reader.getWriter();
+    cairo.setDefaultWidth(DefaultWidth);
+    cairo.setDefaultHeight(DefaultHeight);
+    Reader.parse(in);
+  } else {
+    SVGReaderWriter<CairoSVGWriter> Reader(Outfile, CairoSVGWriter::PDF, Width, Height);
+    Reader.parse(in);
+  }
   return 0;
 }
