@@ -13,7 +13,7 @@ add_compile_options(-Wall -Werror)
 
 add_subdirectory(utils)
 
-set(LIB_SOURCES lib/svg_utils.cc lib/css_utils.cc lib/plotlib.cc)
+set(LIB_SOURCES lib/svg_utils.cc lib/svg_reader_writer.cc lib/css_utils.cc lib/plotlib.cc)
 
 find_package(Cairo)
 find_package(Freetype)
