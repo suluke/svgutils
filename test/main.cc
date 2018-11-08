@@ -39,7 +39,9 @@ template <typename WriterTy> void testSVG() {
     }
   };
   ExtendedWriter svg(std::cout);
-  svg.svg(width(300), height(200)).enter().helloWorld();
+  svg.svg(xmlns(), baseProfile(), version(), width(300), height(200))
+      .enter()
+      .helloWorld();
   // different writers are easily combinable if implemented correctly
   plots::PlotWriter<WriterTy> plot(std::cout);
   svg.continueAs(plot)

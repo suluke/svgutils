@@ -3,10 +3,6 @@ set(PROJECTNAME svgutils)
 project(${PROJECTNAME} CXX C)
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
 set(CMAKE_CXX_STANDARD 17)
-# VA_OPT macro needs c++2a or gnu extensions
-if (NOT ${CMAKE_COMPILER_IS_GNUCXX})
-  set(CMAKE_CXX_STANDARD 2a)
-endif()
 
 include_directories(include/)
 add_compile_options(-Wall -Werror)

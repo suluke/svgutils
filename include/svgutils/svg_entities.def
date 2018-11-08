@@ -1,5 +1,5 @@
 #ifndef SVG_TAG
-#define SVG_TAG(NAME, STR, ...)
+#define SVG_TAG(NAME, STR)
 #endif
 #ifndef SVG_ATTR
 #define SVG_ATTR(NAME, STR, DEFAULT)
@@ -84,7 +84,7 @@ SVG_TAG(set                , "set"                )
 SVG_TAG(solidcolor         , "solidcolor"         )
 SVG_TAG(stop               , "stop"               )
 SVG_TAG(style              , "style"              )
-SVG_TAG(svg                , "svg"                , xmlns(), baseProfile(), version())
+SVG_TAG(svg                , "svg"                )
 SVG_TAG(switch_            , "switch"             )
 SVG_TAG(symbol             , "symbol"             )
 SVG_TAG(text               , "text"               )

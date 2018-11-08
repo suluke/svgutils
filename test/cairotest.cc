@@ -4,13 +4,14 @@
 void testCairo() {
   using namespace svg;
   using WriterTy = CairoSVGWriter;
-  WriterTy writer("test.pdf", WriterTy::PDF, 300., 200.);
+  WriterTy writer("test.pdf", WriterTy::PDF);
   // We can use containers to pass attributes as well
   std::vector<SVGAttribute> rectAttrs(
       {width("100%"), height("100%"), fill("red")});
   // We support attribute initialization with const char*, integers and
   // floats
-  writer
+  writer.svg(xmlns(), baseProfile(), version(), width(300), height(200))
+      .enter()
       .rect(rectAttrs)
       // The following currently forces a newline in the formatted output
       .enter()

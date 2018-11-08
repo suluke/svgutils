@@ -19,7 +19,8 @@ void createMakeSVG() {
   // strings by SVGJSWriter
   JSFunc func("makeSVG(w, h)", std::cout);
   SVGJSWriter writer(std::cout, "rootTags");
-  writer.svg(width("${w}"), height("${h}")).finish();
+  writer.svg(xmlns(), baseProfile(), version(), width("${w}"), height("${h}"))
+      .finish();
 }
 
 void createMakeRect() {

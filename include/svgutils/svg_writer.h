@@ -8,6 +8,7 @@
 #include <iostream>
 #include <map>
 #include <memory>
+#include <set>
 #include <sstream>
 #include <stack>
 #include <string>
@@ -101,16 +102,18 @@ template <typename DerivedTy> class SVGWriterBase {
 public:
   SVGWriterBase(outstream_t &output) : outstream(&output) {}
 
-#define SVG_TAG(NAME, STR, ...)                                                \
+#define SVG_TAG(NAME, STR)                                                     \
   template <typename... attrs_t> DerivedTy &NAME(attrs_t... attrs) {           \
-    openTag(STR __VA_OPT__(, ) __VA_ARGS__, std::forward<attrs_t>(attrs)...);  \
+    openTag(STR, std::forward<attrs_t>(attrs)...);                             \
     return *static_cast<DerivedTy *>(this);                                    \
   }                                                                            \
   template <typename container_t> DerivedTy &NAME(const container_t &attrs) {  \
-    std::vector<SVGAttribute> attrsExt({__VA_ARGS__});                         \
-    for (const SVGAttribute &Att : attrs)                                      \
-      attrsExt.emplace_back(Att);                                              \
-    static_cast<DerivedTy *>(this)->openTag(STR, attrsExt);                    \
+    std::vector<SVGAttribute> attrsVec(attrs.begin(), attrs.end());            \
+    static_cast<DerivedTy *>(this)->openTag(STR, attrsVec);                    \
+    return *static_cast<DerivedTy *>(this);                                    \
+  }                                                                            \
+  DerivedTy &NAME(const std::vector<SVGAttribute> &attrs) {                    \
+    static_cast<DerivedTy *>(this)->openTag(STR, attrs);                       \
     return *static_cast<DerivedTy *>(this);                                    \
   }
 #include "svg_entities.def"
@@ -143,19 +146,11 @@ public:
 
 protected:
   template <typename container_t> void writeAttrs(const container_t &attrs) {
-    std::map<const char *, int> repetitions;
-    for (const auto &attr : attrs)
-      if (repetitions.count(attr.getName()))
-        repetitions[attr.getName()] += 1;
-      else
-        repetitions[attr.getName()] = 1;
+    std::set<const char *> keys;
     for (const auto &attr : attrs) {
-      int &remaining = repetitions[attr.getName()];
-      assert(remaining != 0);
-      if (remaining == 1)
-        output() << " " << attr;
-      else
-        --remaining;
+      assert(!keys.count(attr.getName()) && "Duplicate attribute key");
+      output() << " " << attr;
+      keys.insert(attr.getName());
     }
   }
   template <typename... attrs_t>
