@@ -37,6 +37,12 @@ if (SVG_UTILS_WITH_EXAMPLES)
   add_subdirectory(examples)
 endif()
 
+option(SVG_UTILS_WITH_UNITTESTS "Build svgutils unit tests" ON)
+if (SVG_UTILS_WITH_UNITTESTS)
+  enable_testing()
+  add_subdirectory(unittest)
+endif()
+
 # Check and update source code formatting
 file(GLOB_RECURSE CHECK_FORMAT_SOURCES
   include/svgutils/*.h

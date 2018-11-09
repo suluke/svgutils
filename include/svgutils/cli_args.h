@@ -88,12 +88,15 @@ template <typename T> std::optional<T> CliParseValue(std::string_view value);
 
 /// Common functionality for command line options
 template <typename DerivedTy, typename DecayTy> struct CliOptBase {
-  /// Automatic conversion to the option's underlying value.
-  constexpr operator DecayTy &() const {
-    DecayTy *ptr = static_cast<const DerivedTy *>(this)->getPtr();
-    assert(ptr && "Casting option to underlying type without initialization");
-    return *ptr;
+  ~CliOptBase() {
+    // automatic unregistration
+    if (registrator)
+      registrator(*static_cast<DerivedTy *>(this), false);
   }
+
+  /// Automatic conversion to the option's underlying value.
+  constexpr operator DecayTy &() { return **this; }
+  constexpr operator DecayTy &() const { return **this; }
   /// Use the dereference (->) operator in cases where implicit conversion
   /// to ValContainer fails, i.e. in member lookups.
   constexpr DecayTy *operator->() {
@@ -101,6 +104,15 @@ template <typename DerivedTy, typename DecayTy> struct CliOptBase {
     assert(ptr && "Casting option to underlying type without initialization");
     return ptr;
   }
+  constexpr DecayTy *operator->() const {
+    DecayTy *ptr = static_cast<const DerivedTy *>(this)->getPtr();
+    assert(ptr && "Casting option to underlying type without initialization");
+    return ptr;
+  }
+  /// Use the dereference (*) operator in cases where implicit conversion
+  /// to ValContainer fails, i.e. in member lookups.
+  constexpr DecayTy &operator*() { return *this->operator->(); }
+  constexpr DecayTy &operator*() const { return *this->operator->(); }
   /// Returns whether this is a required option or not.
   constexpr bool required() const { return Required; }
   /// Prints a visual representation of this option to the specified
@@ -131,7 +143,7 @@ protected:
   /// passed to the constructor have been evaluated. It is possible to
   /// register with a different AppTag, so the registration function
   /// needs to be changeable.
-  using RegistrationCB = void (*)(DerivedTy &);
+  using RegistrationCB = void (*)(DerivedTy &, bool);
   RegistrationCB registrator = nullptr;
   std::string_view name = "";
   std::string_view meta = "";
@@ -142,7 +154,10 @@ protected:
   /// Static function to be used for registering a CliOpt with a
   /// ParseArg with a given AppTag. Definition follows further below
   /// after ParseArg has been defined.
-  template <typename AppTag> static void registerWithApp(DerivedTy &);
+  /// @param no_unreg specifies whether registration or unregistration is to be
+  /// performed
+  template <typename AppTag>
+  static void registerWithApp(DerivedTy &, bool no_unreg);
 
   /// Overload to be called after all flags passed to the constructor
   /// have been `consume`d.
@@ -189,12 +204,13 @@ struct CliOpt : public CliOptBase<CliOpt<ValTy>, ValTy> {
       value = OwnedVal(new ValTy);
     if (!base_t::registrator)
       base_t::registrator = &base_t::template registerWithApp<void>;
-    base_t::registrator(*this);
+    base_t::registrator(*this, true);
   }
 
   /// Import conversion operators from base_t
   using base_t::operator DecayTy &;
   using base_t::operator->;
+  using base_t::operator*;
 
   /// Try to parse the given string_views to assign values to this option.
   /// Requires a matching specialization of the CliParseValue template
@@ -283,12 +299,13 @@ struct CliList : public CliOptBase<CliList<ValTy>, std::vector<ValTy>> {
       list = OwnedContainer(new container_t);
     if (!base_t::registrator)
       base_t::registrator = &base_t::template registerWithApp<void>;
-    base_t::registrator(*this);
+    base_t::registrator(*this, true);
   }
 
   /// Import conversion operators from base_t
   using base_t::operator DecayTy &;
   using base_t::operator->;
+  using base_t::operator*;
 
   /// Try to parse the given string_views to assign values to this option.
   /// Requires a matching specialization of the CliParseValue template
@@ -305,22 +322,18 @@ struct CliList : public CliOptBase<CliList<ValTy>, std::vector<ValTy>> {
     }
     return values.size();
   }
-  auto begin() const {
-    container_t *ptr = getPtr();
-    assert(ptr && "Tried to iterate over cl::list prior to initialization");
-    return ptr->begin();
-  }
-  auto end() const {
-    container_t *ptr = getPtr();
-    assert(ptr && "Tried to iterate over cl::list prior to initialization");
-    return ptr->end();
-  }
+  auto begin() const { return (*this)->begin(); }
+  auto end() const { return (*this)->end(); }
+  auto &operator[](size_t i) { return (**this)[i]; }
 
 private:
   using OwnedContainer = std::unique_ptr<container_t>;
   std::variant<container_t *, OwnedContainer> list = nullptr;
 
   void insert(ValTy &&val) {
+    // When getting a value for the first time, make sure the list is empty
+    if (!base_t::valueGiven)
+      getPtr()->clear();
     base_t::valueGiven = true;
     getPtr()->emplace_back(std::move(val));
   }
@@ -541,6 +554,10 @@ template <typename AppTag = void> struct ParseArgs {
     assert(!options().count(name) && "Registered option more than once");
     options()[name] = std::move(opt);
   }
+  static void removeOption(std::string_view name) {
+    assert(options().count(name) && "Tried to remove unregistered option");
+    options().erase(name);
+  }
 
 private:
   const char *tool;
@@ -585,9 +602,17 @@ ParseArgs<>::optionmap_t &ParseArgs<AppTag>::options() {
 
 template <typename DerivedTy, typename DecayTy>
 template <typename AppTag>
-void CliOptBase<DerivedTy, DecayTy>::registerWithApp(DerivedTy &opt) {
-  ParseArgs<AppTag>::addOption(opt.name,
-                               ParseArgs<>::OwnedOption(new CliOptModel(opt)));
+void CliOptBase<DerivedTy, DecayTy>::registerWithApp(DerivedTy &opt,
+                                                     bool no_unreg) {
+  if (no_unreg)
+    ParseArgs<AppTag>::addOption(
+        opt.name, ParseArgs<>::OwnedOption(new CliOptModel(opt)));
+  else {
+    ParseArgs<AppTag>::removeOption(opt.name);
+    // return to unregistered state to prevent further deregistrations
+    // using this registrator function
+    opt.registrator = nullptr;
+  }
 }
 
 /// Definition of CliParseValue<bool>
