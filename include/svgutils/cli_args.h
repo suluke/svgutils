@@ -57,9 +57,9 @@ private:
 /// command line.
 template <typename ValTy> struct CliInit {
   constexpr CliInit(ValTy val) : val(val) {}
+  const ValTy &getValue() const { return val; }
 
 private:
-  template <typename T> friend struct CliOpt;
   ValTy val;
 };
 
@@ -255,9 +255,9 @@ private:
   template <typename T, typename... args_t>
   constexpr void consume(const CliInit<T> &init, args_t &&... args) {
     if (!getPtr())
-      value = OwnedVal(new ValTy(static_cast<const ValTy &>(init.val)));
+      value = OwnedVal(new ValTy(static_cast<const ValTy &>(init.getValue())));
     else
-      *getPtr() = init.val;
+      *getPtr() = init.getValue();
     consume(std::forward<args_t>(args)...);
   }
   /// Import `consume` implementations from base_t
@@ -272,15 +272,15 @@ private:
 /// Implementation of a multi-value command line option
 template <typename ValTy>
 struct CliList : public CliOptBase<CliList<ValTy>, std::vector<ValTy>> {
-  using ValContainer = std::vector<ValTy>;
-  using DecayTy = ValContainer;
+  using container_t = std::vector<ValTy>;
+  using DecayTy = container_t;
   using base_t = CliOptBase<CliList<ValTy>, DecayTy>;
   friend base_t;
 
   template <typename... args_t> constexpr CliList(args_t &&... args) {
     consume(std::forward<args_t>(args)...);
     if (!getPtr())
-      list = OwnedContainer(new ValContainer);
+      list = OwnedContainer(new container_t);
     if (!base_t::registrator)
       base_t::registrator = &base_t::template registerWithApp<void>;
     base_t::registrator(*this);
@@ -306,19 +306,19 @@ struct CliList : public CliOptBase<CliList<ValTy>, std::vector<ValTy>> {
     return values.size();
   }
   auto begin() const {
-    ValContainer *ptr = getPtr();
+    container_t *ptr = getPtr();
     assert(ptr && "Tried to iterate over cl::list prior to initialization");
     return ptr->begin();
   }
   auto end() const {
-    ValContainer *ptr = getPtr();
+    container_t *ptr = getPtr();
     assert(ptr && "Tried to iterate over cl::list prior to initialization");
     return ptr->end();
   }
 
 private:
-  using OwnedContainer = std::unique_ptr<ValContainer>;
-  std::variant<ValContainer *, OwnedContainer> list = nullptr;
+  using OwnedContainer = std::unique_ptr<container_t>;
+  std::variant<container_t *, OwnedContainer> list = nullptr;
 
   void insert(ValTy &&val) {
     base_t::valueGiven = true;
@@ -326,12 +326,12 @@ private:
   }
   void clear() { getPtr()->clear(); }
 
-  constexpr ValContainer *getPtr() const {
-    ValContainer *res = nullptr;
+  constexpr container_t *getPtr() const {
+    container_t *res = nullptr;
     std::visit(
         [&res](auto &&value) {
           using T = std::decay_t<decltype(value)>;
-          if constexpr (std::is_same_v<T, ValContainer *>)
+          if constexpr (std::is_same_v<T, container_t *>)
             res = value;
           else
             res = value.get();
@@ -342,6 +342,18 @@ private:
 
   /// Import `consume` implementations from base_t
   using base_t::consume;
+
+  template <typename T, typename... args_t>
+  void consume(const CliInit<T> &init, args_t &&... args) {
+    if (!getPtr())
+      list = OwnedContainer(new container_t);
+    container_t &list = *this;
+    if constexpr (std::is_assignable_v<T, ValTy>)
+      list.emplace_back(init.getValue());
+    else
+      list.insert(list.end(), init.getValue().begin(), init.getValue().end());
+    consume(std::forward<args_t>(args)...);
+  }
 };
 
 /// Interface for all types of options.
@@ -381,6 +393,10 @@ using desc = CliDesc;
 using required = CliRequired;
 template <typename T> CliInit<T> init(T &&val) {
   return CliInit<T>(std::forward<T>(val));
+}
+template <typename T>
+CliInit<std::vector<T>> init(std::initializer_list<T> &&val) {
+  return CliInit<std::vector<T>>(std::forward<std::initializer_list<T>>(val));
 }
 template <typename T> CliStorage<T> storage(T &storage) {
   return CliStorage(storage);
