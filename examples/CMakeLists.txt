@@ -1,0 +1,11 @@
+function(add_svgutils_test NAME)
+  add_executable(${NAME} ${ARGN})
+  target_link_libraries(${NAME} PRIVATE ${PROJECTNAME})
+endfunction()
+
+add_svgutils_test(test main.cc)
+add_svgutils_test(jstest jstest.cc)
+add_svgutils_test(plottest plottest.cc)
+if (SVG_UTILS_WITH_CAIRO)
+  add_svgutils_test(cairotest cairotest.cc)
+endif()

@@ -30,19 +30,12 @@ if (SVG_UTILS_WITH_CAIRO)
   target_link_libraries(${PROJECTNAME} PRIVATE stdc++fs ${CAIRO_LIBRARIES} ${FONTCONFIG_LIBRARIES} Freetype::Freetype)
 endif()
 
-function(add_svgutils_test NAME)
-  add_executable(${NAME} ${ARGN})
-  target_link_libraries(${NAME} PRIVATE ${PROJECTNAME})
-endfunction()
-
-add_svgutils_test(test test/main.cc)
-add_svgutils_test(jstest test/jstest.cc)
-add_svgutils_test(plottest test/plottest.cc)
-if (SVG_UTILS_WITH_CAIRO)
-  add_svgutils_test(cairotest test/cairotest.cc)
-endif()
-
 add_subdirectory(tools)
+
+option(SVG_UTILS_WITH_EXAMPLES "Build svgutils examples" ON)
+if (SVG_UTILS_WITH_EXAMPLES)
+  add_subdirectory(examples)
+endif()
 
 # Check and update source code formatting
 file(GLOB_RECURSE CHECK_FORMAT_SOURCES
