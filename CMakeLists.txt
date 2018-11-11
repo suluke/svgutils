@@ -3,7 +3,9 @@ project(svgutils CXX C)
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
 set(CMAKE_CXX_STANDARD 17)
 
-include_directories(include/)
+include(SVGUtilsMacros)
+
+include_directories(include/ ${PROJECT_BINARY_DIR}/include/)
 add_compile_options(-Wall -Werror)
 
 add_subdirectory(utils)
