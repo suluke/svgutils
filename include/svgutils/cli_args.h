@@ -80,6 +80,12 @@ template <typename ValTy> struct CliAppTag {};
 /// Indicates that a value for an option is required.
 struct CliRequired {};
 
+/// Indicates that after an option with this attribute was encountered
+/// the library is supposed to stop processing any following arguments
+/// Use ParseArgs::getNumArgsRead() to find out where exactly this
+/// library stopped parsing arguments.
+struct CliOptionEnd {};
+
 /// A free template function to be used by CliOpts to convert command
 /// line argument strings into the type of a corresponding option.
 /// For types not natively supported by this library clients need to
@@ -138,6 +144,8 @@ template <typename DerivedTy, typename DecayTy> struct CliOptBase {
     return true;
   }
 
+  bool isEnd() const { return isFinalOption; }
+
 protected:
   /// Registration is performed dynamically after all configuration flags
   /// passed to the constructor have been evaluated. It is possible to
@@ -150,6 +158,7 @@ protected:
   std::string_view desc = "";
   bool Required = false;
   bool valueGiven = false;
+  bool isFinalOption = false;
 
   /// Static function to be used for registering a CliOpt with a
   /// ParseArg with a given AppTag. Definition follows further below
@@ -188,6 +197,11 @@ protected:
   constexpr void consume(const CliRequired &, args_t &&... args) {
     Required = true;
     static_cast<DerivedTy *>(this)->consume(std::forward<args_t>(args)...);
+  }
+  template <typename... args_t>
+  constexpr void consume(const CliOptionEnd &, args_t &&... args) {
+    isFinalOption = true;
+    consume(std::forward<args_t>(args)...);
   }
 };
 
@@ -376,6 +390,7 @@ struct CliOptConcept {
   parse(std::deque<std::string_view> &values, bool isInline = false) = 0;
   [[nodiscard]] virtual bool validate() const = 0;
   [[nodiscard]] virtual bool required() const = 0;
+  [[nodiscard]] virtual bool isEnd() const = 0;
   virtual void display(std::ostream &os) const = 0;
 
 protected:
@@ -393,6 +408,7 @@ template <typename OptTy> struct CliOptModel : public CliOptConcept {
   }
   [[nodiscard]] bool validate() const override { return opt.validate(); }
   [[nodiscard]] bool required() const override { return opt.required(); }
+  [[nodiscard]] bool isEnd() const override { return opt.isEnd(); }
   void display(std::ostream &os) const override { opt.display(os); }
 
 private:
@@ -404,6 +420,7 @@ using name = CliName;
 using meta = CliMetaName;
 using desc = CliDesc;
 using required = CliRequired;
+using option_end = CliOptionEnd;
 template <typename T> CliInit<T> init(T &&val) {
   return CliInit<T>(std::forward<T>(val));
 }
@@ -425,13 +442,14 @@ template <typename AppTag = void> struct ParseArgs {
   /// The parameter @p tool is the application's name and @p desc should
   /// contain a brief description of what the application does. Both
   /// these values are used by the help message.
-  ParseArgs(const char *tool, const char *desc, int argc, const char **argv)
+  ParseArgs(const char *tool, const char *desc, int argc, const char **argv,
+            int offset = 1)
       : tool(tool), desc(desc) {
     bool verbatim = false;
     std::deque<std::string_view> values;
     std::deque<std::string_view> positional;
-    // =1: Skip executable name in argument parsing
-    for (int argNum = 1; argNum < argc; ++argNum) {
+    for (int argNum = offset; argNum < argc; ++argNum) {
+      ++numArgsRead;
       std::string_view arg = argv[argNum];
       if (!verbatim && arg == "--") {
         // Treat all remaining arguments as verbatim
@@ -460,6 +478,11 @@ template <typename AppTag = void> struct ParseArgs {
                 "Failing to parse inline argument MUST result in std::nullopt");
           // Don't forget to clear!!!
           values.clear();
+          // If this is the final option, only break to give positional
+          // arguments collected so far the chance to be consumed by
+          // a corresponding option
+          if (opt->isEnd())
+            break;
           // The option ends after the inline value
           continue;
         }
@@ -486,8 +509,11 @@ template <typename AppTag = void> struct ParseArgs {
           svg_unreachable("Illegal number of values read by option");
         for (size_t i = 0; i < *res; ++i)
           values.pop_front();
+        numArgsRead += *res;
         positional.insert(positional.end(), values.begin(), values.end());
         values.clear();
+        if (opt->isEnd())
+          break;
       } else
         positional.push_back(arg);
     }
@@ -505,6 +531,9 @@ template <typename AppTag = void> struct ParseArgs {
         bail();
       if (0 > *res || *res > positional.size())
         svg_unreachable("Illegal number of values read by option");
+      numArgsRead += *res;
+      if (eatAll->isEnd())
+        return;
       if (*res != positional.size()) {
         std::cerr << "Too many positional arguments given:\n";
         for (auto It = positional.begin() + *res, End = positional.end();
@@ -549,6 +578,8 @@ template <typename AppTag = void> struct ParseArgs {
     }
   }
 
+  int getNumArgsRead() const { return numArgsRead; }
+
   /// Add an option to the ParseArg namespace denoted by AppTag.
   static void addOption(std::string_view name, OwnedOption opt) {
     assert(!options().count(name) && "Registered option more than once");
@@ -562,6 +593,7 @@ template <typename AppTag = void> struct ParseArgs {
 private:
   const char *tool;
   const char *desc;
+  int numArgsRead = 0;
 
   using optionmap_t = std::map<std::string_view, OwnedOption>;
   /// This function is used for implementing the registration process.
