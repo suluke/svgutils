@@ -1,6 +1,5 @@
 cmake_minimum_required(VERSION 3.11)
-set(PROJECTNAME svgutils)
-project(${PROJECTNAME} CXX C)
+project(svgutils CXX C)
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
 set(CMAKE_CXX_STANDARD 17)
 
@@ -24,10 +23,10 @@ if (SVG_UTILS_WITH_CAIRO)
   list(APPEND LIB_SOURCES lib/svg_cairo.cc lib/freetype.cc)
 endif()
 
-add_library(${PROJECTNAME} ${LIB_SOURCES})
+add_library(${PROJECT_NAME} ${LIB_SOURCES})
 
 if (SVG_UTILS_WITH_CAIRO)
-  target_link_libraries(${PROJECTNAME} PRIVATE stdc++fs ${CAIRO_LIBRARIES} ${FONTCONFIG_LIBRARIES} Freetype::Freetype)
+  target_link_libraries(${PROJECT_NAME} PRIVATE stdc++fs ${CAIRO_LIBRARIES} ${FONTCONFIG_LIBRARIES} Freetype::Freetype)
 endif()
 
 add_subdirectory(tools)
@@ -56,25 +55,25 @@ set(check_format_depends)
 set(update_format_depends)
 set(i 0)
 foreach (file IN LISTS CHECK_FORMAT_SOURCES)
-  add_custom_command(OUTPUT ${PROJECTNAME}-check-format${i}
+  add_custom_command(OUTPUT ${PROJECT_NAME}-check-format${i}
     COMMAND clang-format -sort-includes -style=llvm ${file} | diff -u ${file} -
     VERBATIM
     COMMENT "Checking format of ${file}..."
   )
-  list(APPEND check_format_depends "${PROJECTNAME}-check-format${i}")
+  list(APPEND check_format_depends "${PROJECT_NAME}-check-format${i}")
 
-  add_custom_command(OUTPUT ${PROJECTNAME}-update-format${i}
+  add_custom_command(OUTPUT ${PROJECT_NAME}-update-format${i}
     COMMAND clang-format -sort-includes -i -style=llvm ${file}
     VERBATIM
     COMMENT "Updating format of ${file}..."
   )
-  list(APPEND update_format_depends "${PROJECTNAME}-update-format${i}")
+  list(APPEND update_format_depends "${PROJECT_NAME}-update-format${i}")
 
   math(EXPR i ${i}+1)
 endforeach ()
 
-add_custom_target(${PROJECTNAME}-check-format DEPENDS ${check_format_depends})
-set_target_properties(${PROJECTNAME}-check-format PROPERTIES FOLDER "${PROJECTNAME}")
+add_custom_target(${PROJECT_NAME}-check-format DEPENDS ${check_format_depends})
+set_target_properties(${PROJECT_NAME}-check-format PROPERTIES FOLDER "${PROJECT_NAME}")
 
-add_custom_target(${PROJECTNAME}-update-format DEPENDS ${update_format_depends})
-set_target_properties(${PROJECTNAME}-update-format PROPERTIES FOLDER "${PROJECTNAME}")
+add_custom_target(${PROJECT_NAME}-update-format DEPENDS ${update_format_depends})
+set_target_properties(${PROJECT_NAME}-update-format PROPERTIES FOLDER "${PROJECT_NAME}")

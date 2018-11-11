@@ -1,6 +1,6 @@
 function(add_svgutils_test NAME)
   add_executable(${NAME} ${ARGN})
-  target_link_libraries(${NAME} PRIVATE ${PROJECTNAME})
+  target_link_libraries(${NAME} PRIVATE ${PROJECT_NAME})
 endfunction()
 
 add_svgutils_test(svgtest main.cc)
