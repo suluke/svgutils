@@ -49,6 +49,7 @@ file(GLOB_RECURSE CHECK_FORMAT_SOURCES
   include/svgutils/*.h
   lib/*.cc
   test/*.h test/*.cc
+  unittest/*.h unittest/*.cc
   utils/*.h utils/*.cc
   )
 

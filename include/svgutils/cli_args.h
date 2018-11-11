@@ -1,5 +1,33 @@
 #ifndef SVGUTILS_UTILS_CLI_ARGS_H
 #define SVGUTILS_UTILS_CLI_ARGS_H
+/// The svgutils command line argument library
+///
+/// Features:
+/// * Declarative configuration of the option parser using option variables.
+/// * Support for scalar and aggregate options.
+/// * Support for global or local option definitions.
+///   Local options will unregister automatically when going out of scope.
+/// * Support for application namespaces ("AppTag") to avoid
+///   option pollution from global options in different compile units.
+/// * Easy extendability for custom types by specializing CliParseValue.
+/// * Automatic help text generation (printHelp).
+/// * Support for 'stacked' option parsing, i.e. stopping parsing at some
+///   point to continue with a different parsing configuration.
+///
+/// Brief overview:
+/// * cl::opt for single-valued options
+/// * cl::list for multi-valued options
+/// * cl::name to specify names for an option
+///   - No name or "": Handle positional arguments
+///   - Multiple option names are possible
+/// * cl::meta for describing value roles (used in printHelp)
+/// * cl::desc for option description (used in printHelp)
+/// * cl::init for initial option values
+/// * cl::required to force users to provide a value
+/// * cl::storage to re-use existing variables for option storage
+/// * cl::option_end to stop the parser after the corresponding option
+///   has been parsed.
+/// * cl::app to specify the application the option is intended for
 
 #include "svgutils/utils.h"
 
@@ -124,8 +152,8 @@ template <typename DerivedTy, typename DecayTy> struct CliOptBase {
   /// Prints a visual representation of this option to the specified
   /// stream @p os.
   void display(std::ostream &os) const {
-    if (name.size())
-      os << "-" << name;
+    if (names.size() && names.front() != "")
+      os << "-" << names.front();
     else
       os << meta;
   }
@@ -137,7 +165,7 @@ template <typename DerivedTy, typename DecayTy> struct CliOptBase {
       if (!valueGiven) {
         std::cerr << "Required value not given for option \"";
         display(std::cerr);
-        std::cerr << "\"" << std::endl;
+        std::cerr << "\"\n";
       }
       return valueGiven;
     }
@@ -153,7 +181,7 @@ protected:
   /// needs to be changeable.
   using RegistrationCB = void (*)(DerivedTy &, bool);
   RegistrationCB registrator = nullptr;
-  std::string_view name = "";
+  std::vector<std::string_view> names;
   std::string_view meta = "";
   std::string_view desc = "";
   bool Required = false;
@@ -174,7 +202,7 @@ protected:
 
   template <typename... args_t>
   constexpr void consume(const CliName &name, args_t &&... args) {
-    this->name = name.name;
+    names.emplace_back(name.name);
     static_cast<DerivedTy *>(this)->consume(std::forward<args_t>(args)...);
   }
   template <typename... args_t>
@@ -201,7 +229,7 @@ protected:
   template <typename... args_t>
   constexpr void consume(const CliOptionEnd &, args_t &&... args) {
     isFinalOption = true;
-    consume(std::forward<args_t>(args)...);
+    static_cast<DerivedTy *>(this)->consume(std::forward<args_t>(args)...);
   }
 };
 
@@ -293,11 +321,6 @@ private:
   /// Import `consume` implementations from base_t
   using base_t::consume;
 };
-
-// TODO
-//~ struct CliAlias {
-
-//~ };
 
 /// Implementation of a multi-value command line option
 template <typename ValTy>
@@ -431,6 +454,7 @@ CliInit<std::vector<T>> init(std::initializer_list<T> &&val) {
 template <typename T> CliStorage<T> storage(T &storage) {
   return CliStorage(storage);
 }
+template <typename T> CliAppTag<T> app() { return CliAppTag<T>(); }
 template <typename T> using opt = CliOpt<T>;
 template <typename T> using list = CliList<T>;
 
@@ -459,7 +483,7 @@ template <typename AppTag = void> struct ParseArgs {
         std::string_view name = parseOptName(arg);
         OwnedOption &opt = options()[name];
         if (!opt) {
-          std::cerr << "Encountered unknown option " << arg << std::endl;
+          std::cerr << "Encountered unknown option " << arg << '\n';
           bail();
         }
         // Is the argument just the name or also an '=' assignment?
@@ -523,7 +547,7 @@ template <typename AppTag = void> struct ParseArgs {
       if (!eatAll) {
         std::cerr << "Too many positional arguments given:\n";
         for (const auto &arg : positional)
-          std::cerr << arg << std::endl;
+          std::cerr << arg << '\n';
         bail();
       }
       auto res = eatAll->parse(positional);
@@ -538,7 +562,7 @@ template <typename AppTag = void> struct ParseArgs {
         std::cerr << "Too many positional arguments given:\n";
         for (auto It = positional.begin() + *res, End = positional.end();
              It != End; ++It)
-          std::cerr << *It << std::endl;
+          std::cerr << *It << '\n';
         bail();
       }
     }
@@ -566,15 +590,14 @@ template <typename AppTag = void> struct ParseArgs {
       if (!eatAll->required())
         std::cout << "]";
     }
-    std::cout << std::endl;
-    std::cout << std::endl;
-    std::cout << "Options:" << std::endl;
+    std::cout << "\n\n";
+    std::cout << "Options:\n";
     for (const auto &KeyValuePair : options()) {
       const OwnedOption &opt = KeyValuePair.second;
       if (opt == eatAll)
         continue;
       opt->display(std::cout);
-      std::cout << std::endl;
+      std::cout << '\n';
     }
   }
 
@@ -619,7 +642,7 @@ private:
     return opt;
   }
   void bail() {
-    std::cout << std::endl;
+    std::cout << '\n';
     printHelp();
     std::exit(1);
   }
@@ -636,11 +659,18 @@ template <typename DerivedTy, typename DecayTy>
 template <typename AppTag>
 void CliOptBase<DerivedTy, DecayTy>::registerWithApp(DerivedTy &opt,
                                                      bool no_unreg) {
-  if (no_unreg)
-    ParseArgs<AppTag>::addOption(
-        opt.name, ParseArgs<>::OwnedOption(new CliOptModel(opt)));
-  else {
-    ParseArgs<AppTag>::removeOption(opt.name);
+  if (no_unreg) {
+    for (const auto &name : opt.names)
+      ParseArgs<AppTag>::addOption(
+          name, ParseArgs<>::OwnedOption(new CliOptModel(opt)));
+    if (opt.names.empty())
+      ParseArgs<AppTag>::addOption(
+          "", ParseArgs<>::OwnedOption(new CliOptModel(opt)));
+  } else {
+    for (const auto &name : opt.names)
+      ParseArgs<AppTag>::removeOption(name);
+    if (opt.names.empty())
+      ParseArgs<AppTag>::removeOption("");
     // return to unregistered state to prevent further deregistrations
     // using this registrator function
     opt.registrator = nullptr;
@@ -700,7 +730,7 @@ std::optional<size_t> CliOpt<bool>::parse(std::deque<std::string_view> &values,
   if (!parsed) {
     std::cerr << "Could not parse boolean value for flag ";
     display(std::cerr);
-    std::cerr << ": " << values.front() << std::endl;
+    std::cerr << ": " << values.front() << '\n';
     return std::nullopt;
   }
   // Assign takes rvalue, so we need to be slightly stupid here

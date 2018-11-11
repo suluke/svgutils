@@ -10,8 +10,9 @@ static const char *TOOLDESC = "Unittests for the cli_args library";
 
 /// Simple test to check for string list parsing support
 TEST(CliArgsTest, StringList) {
-  cl::list<std::string> Strings(cl::name("s"), cl::init({"Inputs"}));
-  std::array args{"", "-s", "a", "b", "c"};
+  cl::list<std::string> Strings(cl::name("strings"), cl::name("s"),
+                                cl::init({"Inputs"}));
+  std::array args{"", "-s", "a", "b", "--strings", "c"};
   cl::ParseArgs(TOOLNAME, TOOLDESC, args.size(), args.data());
   ASSERT_EQ(Strings->size(), 3);
   EXPECT_EQ(Strings[0], "a");
