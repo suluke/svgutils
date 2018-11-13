@@ -243,7 +243,7 @@ struct CliOpt : public CliOptBase<CliOpt<ValTy>, ValTy> {
   template <typename... args_t> constexpr CliOpt(args_t &&... args) {
     consume(std::forward<args_t>(args)...);
     if (!getPtr())
-      value = OwnedVal(new ValTy);
+      value = std::make_unique<ValTy>();
     if (!base_t::registrator)
       base_t::registrator = &base_t::template registerWithApp<void>;
     base_t::registrator(*this, true);
@@ -313,7 +313,8 @@ private:
   template <typename T, typename... args_t>
   constexpr void consume(const CliInit<T> &init, args_t &&... args) {
     if (!getPtr())
-      value = OwnedVal(new ValTy(static_cast<const ValTy &>(init.getValue())));
+      value =
+          std::make_unique<ValTy>(static_cast<const ValTy &>(init.getValue()));
     else
       *getPtr() = init.getValue();
     consume(std::forward<args_t>(args)...);
@@ -333,7 +334,7 @@ struct CliList : public CliOptBase<CliList<ValTy>, std::vector<ValTy>> {
   template <typename... args_t> constexpr CliList(args_t &&... args) {
     consume(std::forward<args_t>(args)...);
     if (!getPtr())
-      list = OwnedContainer(new container_t);
+      list = std::make_unique<container_t>();
     if (!base_t::registrator)
       base_t::registrator = &base_t::template registerWithApp<void>;
     base_t::registrator(*this, true);
@@ -396,7 +397,7 @@ private:
   template <typename T, typename... args_t>
   void consume(const CliInit<T> &init, args_t &&... args) {
     if (!getPtr())
-      list = OwnedContainer(new container_t);
+      list = std::make_unique<container_t>();
     container_t &list = *this;
     if constexpr (std::is_assignable_v<T, ValTy>)
       list.emplace_back(init.getValue());
@@ -662,10 +663,10 @@ void CliOptBase<DerivedTy, DecayTy>::registerWithApp(DerivedTy &opt,
   if (no_unreg) {
     for (const auto &name : opt.names)
       ParseArgs<AppTag>::addOption(
-          name, ParseArgs<>::OwnedOption(new CliOptModel(opt)));
+          name, std::make_unique<CliOptModel<DerivedTy>>(opt));
     if (opt.names.empty())
       ParseArgs<AppTag>::addOption(
-          "", ParseArgs<>::OwnedOption(new CliOptModel(opt)));
+          "", std::make_unique<CliOptModel<DerivedTy>>(opt));
   } else {
     for (const auto &name : opt.names)
       ParseArgs<AppTag>::removeOption(name);
