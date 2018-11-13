@@ -2,14 +2,31 @@
 #define SVGUTILS_UTILS_CLI_ARGS_H
 /// The svgutils command line argument library
 ///
+/// Goals:
+/// * Declarative command line definition
+/// * Type safety
+/// * Automatic documentation (help dialog) generation
+/// * Header-only implementation
+/// * Easy customization and extension
+///
+/// Non-Goals:
+/// * Windows-style option parsing ('/X /Y' instead of '-X -Y')
+/// * Short vs long option differentiation (especially collapsing of
+///   multiple short options into one, e.g. '-abc' = '-a -b -c')
+/// * Provide defaults for what can trivially be implemented by the user.
+///   E.g. default options like --help or --version.
+///
 /// Features:
 /// * Declarative configuration of the option parser using option variables.
 /// * Support for scalar and aggregate options.
+/// * Support for '-opt=val' syntax
 /// * Support for global or local option definitions.
 ///   Local options will unregister automatically when going out of scope.
 /// * Support for application namespaces ("AppTag") to avoid
-///   option pollution from global options in different compile units.
+///   option pollution from global options in different compilation units.
 /// * Easy extendability for custom types by specializing CliParseValue.
+///   Alternatively, implement your own option types, only relying on
+///   the CliOptConcept interface and ParseOption public APIs
 /// * Automatic help text generation (printHelp).
 /// * Support for 'stacked' option parsing, i.e. stopping parsing at some
 ///   point to continue with a different parsing configuration.
