@@ -44,6 +44,12 @@ if (SVG_UTILS_WITH_UNITTESTS)
   add_subdirectory(unittest)
 endif()
 
+option(SVG_UTILS_WITH_TESTS "Run svgutils regression tests in test target" ON)
+if (SVG_UTILS_WITH_TESTS)
+  enable_testing()
+  add_subdirectory(test)
+endif()
+
 # Check and update source code formatting
 file(GLOB_RECURSE CHECK_FORMAT_SOURCES
   include/svgutils/*.h

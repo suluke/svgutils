@@ -1,0 +1,1 @@
+RUN: echo %s %S %p %t %T %{pathsep} Success

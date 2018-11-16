@@ -6,3 +6,4 @@ function(add_svg_util UTIL)
 endfunction()
 
 add_subdirectory(svg2cxx)
+add_subdirectory(tedisex)
