@@ -3,6 +3,8 @@
 
 #include <fontconfig/fontconfig.h>
 
+#include <ft2build.h>
+#include FT_FREETYPE_H
 #include FT_CACHE_H
 
 #include <cassert>
@@ -10,6 +12,7 @@
 #include <iostream>
 #include <map>
 #include <set>
+#include <string>
 
 using namespace svg;
 

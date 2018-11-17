@@ -1,4 +1,6 @@
 #include "svgcairo/svg_cairo.h"
+#include <cairo/cairo-ft.h>
+#include <cairo/cairo-pdf.h>
 #include <cmath>
 #include <cstring>
 

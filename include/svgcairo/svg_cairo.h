@@ -5,9 +5,10 @@
 #include "svgutils/css_utils.h"
 #include "svgutils/svg_writer.h"
 
-#include <cairo/cairo-ft.h>
-#include <cairo/cairo-pdf.h>
 #include <filesystem>
+
+struct _cairo;
+struct _cairo_surface;
 
 namespace svg {
 
@@ -60,9 +61,11 @@ private:
   double dfltHeight = 200;
   double width = 0;
   double height = 0;
+  using SurfaceDestroyTy = void(*)(_cairo_surface *);
   using OwnedSurface =
-      std::unique_ptr<cairo_surface_t, decltype(&cairo_surface_destroy)>;
-  using OwnedCairo = std::unique_ptr<cairo_t, decltype(&cairo_destroy)>;
+      std::unique_ptr<_cairo_surface, SurfaceDestroyTy>;
+  using CairoDestroyTy = void(*)(_cairo *);
+  using OwnedCairo = std::unique_ptr<_cairo, CairoDestroyTy>;
   OwnedSurface surface = {nullptr, nullptr};
   OwnedCairo cairo = {nullptr, nullptr};
 

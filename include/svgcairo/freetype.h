@@ -3,10 +3,8 @@
 
 #include <memory>
 #include <optional>
-#include <string>
 
-#include <ft2build.h>
-#include FT_FREETYPE_H
+struct FT_FaceRec_;
 
 namespace svg {
 struct Freetype {
@@ -14,6 +12,7 @@ struct Freetype {
   Freetype &operator=(Freetype &&);
   ~Freetype();
 
+  using FT_Face = FT_FaceRec_ *;
   FT_Face getFace(const char *desc);
 
   static std::optional<Freetype> Create();

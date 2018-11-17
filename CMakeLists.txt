@@ -21,13 +21,13 @@ if (NOT CAIRO_FOUND OR NOT FREETYPE_FOUND OR NOT FONTCONFIG_FOUND)
   set(SVG_UTILS_WITH_CAIRO OFF CACHE BOOL "Build with Cairo backend support" FORCE)
 endif()
 if (SVG_UTILS_WITH_CAIRO)
-  include_directories(${CAIRO_INCLUDE_DIRS} ${FREETYPE_INCLUDE_DIRS})
   list(APPEND LIB_SOURCES lib/svg_cairo.cc lib/freetype.cc)
 endif()
 
 add_library(${PROJECT_NAME} ${LIB_SOURCES})
 
 if (SVG_UTILS_WITH_CAIRO)
+  target_include_directories(${PROJECT_NAME} SYSTEM PRIVATE ${CAIRO_INCLUDE_DIRS} ${FREETYPE_INCLUDE_DIRS})
   target_link_libraries(${PROJECT_NAME} PRIVATE stdc++fs ${CAIRO_LIBRARIES} ${FONTCONFIG_LIBRARIES} Freetype::Freetype)
 endif()
 
