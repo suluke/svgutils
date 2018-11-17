@@ -3,12 +3,13 @@
 
 #include <filesystem>
 #include <fstream>
+#include <variant>
 
 using namespace svg;
 namespace fs = std::filesystem;
 
 static cl::opt<fs::path> Infile(cl::meta("Input"), cl::required());
-static cl::opt<fs::path> Outfile(cl::name("o"), cl::required());
+static cl::opt<fs::path> Outfile(cl::name("o"), cl::init("-"));
 static cl::opt<bool> Verbose(cl::name("v"), cl::init(false));
 
 static const char *TOOLNAME = "svgfmt";
@@ -21,10 +22,18 @@ int main(int argc, const char **argv) {
     return 1;
   }
   std::fstream in(Infile->c_str(), in.in);
-  std::fstream out(Outfile->c_str(), out.out);
-  SVGReaderWriter<SVGFormattedWriter> Reader(out);
-  if (!Reader.parse(in)) {
-    std::cerr << "An error occurred" << std::endl;
+  std::optional<std::fstream> out_storage;
+  std::ostream *out = nullptr;
+  if (*Outfile == "-")
+    out = &std::cout;
+  else {
+    out_storage = std::fstream(Outfile->c_str(), std::fstream::out);
+    out = &*out_storage;
+  }
+
+  SVGReaderWriter<SVGFormattedWriter> Reader(*out);
+  if (auto err = Reader.parse(in)) {
+    std::cerr << "An error occurred:\n" << *err << std::endl;
     return 1;
   }
   return 0;
