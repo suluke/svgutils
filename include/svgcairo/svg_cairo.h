@@ -44,6 +44,7 @@ public:
 #include "svgutils/svg_entities.def"
 
   self_t &content(const char *text);
+  self_t &comment(const char *comment);
 
   self_t &enter();
   self_t &leave();

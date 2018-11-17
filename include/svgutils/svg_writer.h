@@ -123,6 +123,11 @@ public:
     output() << text;
     return *static_cast<DerivedTy *>(this);
   }
+  DerivedTy &comment(const char *comment) {
+    static_cast<DerivedTy *>(this)->closeTag();
+    output() << "<!-- " << comment << " -->";
+    return *static_cast<DerivedTy *>(this);
+  }
 
   DerivedTy &enter() {
     assert(currentTag && "Cannot enter without root tag");
@@ -215,6 +220,12 @@ struct SVGFormattedWriter : public SVGWriterBase<SVGFormattedWriter> {
     base_t::output() << text << "\n";
     return *this;
   }
+  self_t &comment(const char *comment) {
+    closeTag();
+    writeIndent();
+    output() << "<!--\n" << comment << "\n-->";
+    return *this;
+  }
 
 private:
   static inline outstream_t &repeat(outstream_t &os, char c, size_t count) {
@@ -269,6 +280,7 @@ struct WriterConcept {
   virtual void enter() = 0;
   virtual void leave() = 0;
   virtual void content(const char *) = 0;
+  virtual void comment(const char *) = 0;
   virtual void finish() = 0;
 };
 
@@ -285,6 +297,7 @@ template <typename WriterTy> struct WriterModel : public virtual WriterConcept {
   void enter() override { Writer.enter(); }
   void leave() override { Writer.leave(); }
   void content(const char *text) override { Writer.content(text); }
+  void comment(const char *comment) override { Writer.comment(comment); }
   void finish() override { Writer.finish(); }
   WriterTy &getWriter() { return Writer; }
 
@@ -320,6 +333,10 @@ template <typename DerivedT> struct ExtendableWriter {
   }
   DerivedT &content(const char *text) {
     Writer->content(text);
+    return *static_cast<DerivedT *>(this);
+  }
+  DerivedT &comment(const char *text) {
+    Writer->comment(text);
     return *static_cast<DerivedT *>(this);
   }
   DerivedT &finish() {

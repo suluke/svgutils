@@ -156,6 +156,11 @@ CairoSVGWriter &CairoSVGWriter::content(const char *text) {
 
   return *this;
 }
+
+CairoSVGWriter &CairoSVGWriter::comment(const char *comment) {
+  return *this;
+}
+
 CairoSVGWriter &CairoSVGWriter::enter() {
   assert(currentTag != TagType::NONE && "Cannot enter without root tag");
   parents.push(currentTag);
