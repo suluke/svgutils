@@ -223,7 +223,12 @@ struct SVGFormattedWriter : public SVGWriterBase<SVGFormattedWriter> {
   self_t &comment(const char *comment) {
     closeTag();
     writeIndent();
-    output() << "<!--\n" << comment << "\n-->";
+    output() << "<!--\n";
+    writeIndent();
+    std::string_view trimmed = strview_trim(comment);
+    output() << trimmed << '\n';
+    writeIndent();
+    output() << "-->\n";
     return *this;
   }
 
