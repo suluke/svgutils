@@ -188,24 +188,28 @@ static error_or<Test> parse_test(const fs::path &testpath) {
   if (!input)
     return error(testpath, "Error opening file");
   bool runMultiLine = false;
+  const char RunStr[] = "RUN:";
+  const char XfailStr[] = "XFAIL:";
+  const char RequiresStr[] = "REQUIRES:";
+  const char UnsupportedStr[] = "UNSUPPORTED:";
   for (;;) {
     std::getline(input, line);
-    if (auto pos = line.find("RUN:"); pos != line.npos) {
-      line = line.substr(pos + 4);
+    if (auto pos = line.find(RunStr); pos != line.npos) {
+      line = line.substr(pos + sizeof(RunStr) - 1);
       if (runMultiLine)
         test.run.back().append(line);
       else
         test.run.emplace_back(line);
       if (line.back() == '\\')
         runMultiLine = true;
-    } else if (auto pos = line.find("XFAIL:"); pos != line.npos) {
-      line = line.substr(pos + 6);
+    } else if (auto pos = line.find(XfailStr); pos != line.npos) {
+      line = line.substr(pos + sizeof(XfailStr) - 1);
       test.xfail.emplace_back(line);
-    } else if (auto pos = line.find("REQUIRED:"); pos != line.npos) {
-      line = line.substr(pos + 9);
+    } else if (auto pos = line.find(RequiresStr); pos != line.npos) {
+      line = line.substr(pos + sizeof(RequiresStr) - 1);
       test.required.emplace_back(line);
-    } else if (auto pos = line.find("UNSUPPORTED:"); pos != line.npos) {
-      line = line.substr(pos + 12);
+    } else if (auto pos = line.find(UnsupportedStr); pos != line.npos) {
+      line = line.substr(pos + sizeof(UnsupportedStr) - 1);
       test.unsupported.emplace_back(line);
     }
     if (input.bad())
