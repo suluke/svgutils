@@ -106,12 +106,14 @@ public:
   void pop();
   CSSColor getColor() const;
   CSSColor getFill() const;
+  std::string_view getFontFamily() const;
+  CSSUnit getFontSize() const;
+  CSSUnit getHeight() const;
   CSSColor getStroke() const;
   CSSUnit getStrokeWidth() const;
   CSSDashArray getStrokeDasharray() const;
-  std::string_view getFontFamily() const;
-  CSSUnit getFontSize() const;
   CSSTextAnchor getTextAnchor() const;
+  CSSUnit getWidth() const;
 
   struct StyleDiff;
   enum class Style;

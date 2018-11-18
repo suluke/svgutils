@@ -1,0 +1,20 @@
+#ifndef CSS_PROPERTY
+#define CSS_PROPERTY(NAME, STR)
+#endif
+
+CSS_PROPERTY(COLOR,            "color")
+CSS_PROPERTY(BACKGROUND_COLOR, "background-color")
+CSS_PROPERTY(FONT_FAMILY,      "font")
+CSS_PROPERTY(FONT_SIZE,        "font-size")
+CSS_PROPERTY(FONT_WEIGHT,      "font-weight")
+CSS_PROPERTY(FILL,             "fill")
+CSS_PROPERTY(HEIGHT,           "height")
+CSS_PROPERTY(STROKE,           "stroke")
+CSS_PROPERTY(STROKE_WIDTH,     "stroke-width")
+CSS_PROPERTY(STROKE_DASHARRAY, "stroke-dasharray")
+CSS_PROPERTY(TRANSFORM,        "transform")
+CSS_PROPERTY(TEXT_ANCHOR,      "text-anchor")
+CSS_PROPERTY(OPACITY,          "opacity")
+CSS_PROPERTY(WIDTH,            "width")
+
+#undef CSS_PROPERTY

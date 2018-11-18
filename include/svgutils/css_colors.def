@@ -152,5 +152,4 @@ CSS_COLOR("whitesmoke",           "#f5f5f5")
 CSS_COLOR("yellow",               "#ffff00")
 CSS_COLOR("yellowgreen",          "#9acd32")
 
-
 #undef CSS_COLOR

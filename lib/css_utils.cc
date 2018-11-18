@@ -218,92 +218,139 @@ CSSDashArray CSSDashArray::parse(std::string_view str) {
 }
 
 enum class StyleTracker::Style {
-  COLOR,
-  BACKGROUND_COLOR,
-  FONT_FAMILY,
-  FONT_SIZE,
-  FONT_WEIGHT,
-  FILL,
-  STROKE,
-  STROKE_WIDTH,
-  STROKE_DASHARRAY,
-  TRANSFORM,
-  TEXT_ANCHOR,
-  OPACITY
+#define CSS_PROPERTY(NAME, STR) NAME,
+#include "svgutils/css_properties.def"
 };
+
+static constexpr const char *getStyleName(StyleTracker::Style style) {
+  using Style = StyleTracker::Style;
+  switch (style) {
+#define CSS_PROPERTY(NAME, STR)                                                \
+  case Style::NAME:                                                            \
+    return STR;
+#include "svgutils/css_properties.def"
+  }
+  return nullptr;
+}
+
+static outstream_t &operator<<(outstream_t &os, StyleTracker::Style style) {
+  os << getStyleName(style);
+  return os;
+}
 
 struct StyleTracker::StyleDiff {
   std::map<Style, std::string> styles;
-  inline void extend(StyleDiff &&diff) {
+  std::string &operator[](Style S) { return styles[S]; }
+  void extend(StyleDiff &&diff) {
+    // merge will not overwrite existing entries. To make sure that all
+    // styles from @p diff end up in this StyleDiff we need to swap the
+    // contents first
     styles.swap(diff.styles);
     styles.merge(diff.styles);
   }
-  inline void extend(const StyleDiff &diff) {
+  void extend(const StyleDiff &diff) {
     for (const auto &KeyValuePair : diff.styles)
       styles.insert_or_assign(KeyValuePair.first, KeyValuePair.second);
   }
+  friend inline outstream_t &operator<<(outstream_t &os,
+                                        const StyleDiff &diff) {
+    for (const auto &KeyValuePair : diff.styles)
+      os << KeyValuePair.first << ": " << KeyValuePair.second << ";\n";
+    return os;
+  }
 };
+
+static StyleTracker::StyleDiff
+parseStyleDeclaration(const std::string_view &name,
+                      const std::string_view &value) {
+  // TODO parse combined styles like e.g. 'background'
+  using Style = StyleTracker::Style;
+  StyleTracker::StyleDiff diff;
+#define CSS_PROPERTY(NAME, STR)                                                \
+  if (name == STR)                                                             \
+    diff[Style::NAME] = std::string{value};
+#include "svgutils/css_properties.def"
+  return diff;
+}
 
 namespace {
 struct StyleParser
     : public SVGAttributeVisitor<StyleParser, StyleTracker::StyleDiff> {
   using StyleDiff = StyleTracker::StyleDiff;
   static StyleDiff parseStyles(const StyleTracker::AttrContainer &attrs);
-  StyleDiff visit_color(const svg::color &attr);
-  StyleDiff visit_font_family(const svg::font_family &attr);
-  StyleDiff visit_font_size(const svg::font_size &attr);
-  StyleDiff visit_fill(const svg::fill &attr);
-  StyleDiff visit_stroke(const svg::stroke &attr);
-  StyleDiff visit_stroke_width(const svg::stroke_width &attr);
-  StyleDiff visit_stroke_dasharray(const svg::stroke_dasharray &attr);
-  StyleDiff visit_text_anchor(const svg::text_anchor &attr);
+  StyleDiff visit_color(const svg::color &attr) {
+    StyleDiff diff;
+    diff.styles[StyleTracker::Style::COLOR] = attr.getValue();
+    return diff;
+  }
+  StyleDiff visit_font_family(const svg::font_family &attr) {
+    StyleDiff diff;
+    diff.styles[StyleTracker::Style::FONT_FAMILY] = attr.getValue();
+    return diff;
+  }
+  StyleDiff visit_font_size(const svg::font_size &attr) {
+    StyleDiff diff;
+    diff.styles[StyleTracker::Style::FONT_SIZE] = attr.getValue();
+    return diff;
+  }
+  StyleDiff visit_fill(const svg::fill &attr) {
+    StyleDiff diff;
+    diff.styles[StyleTracker::Style::FILL] = attr.getValue();
+    return diff;
+  }
+  StyleDiff visit_height(const svg::height &attr) {
+    StyleDiff diff;
+    diff.styles[StyleTracker::Style::HEIGHT] = attr.getValue();
+    return diff;
+  }
+  StyleDiff visit_stroke(const svg::stroke &attr) {
+    StyleDiff diff;
+    diff.styles[StyleTracker::Style::STROKE] = attr.getValue();
+    return diff;
+  }
+  StyleDiff visit_stroke_width(const svg::stroke_width &attr) {
+    StyleDiff diff;
+    diff.styles[StyleTracker::Style::STROKE_WIDTH] = attr.getValue();
+    return diff;
+  }
+  StyleDiff visit_stroke_dasharray(const svg::stroke_dasharray &attr) {
+    StyleDiff diff;
+    diff.styles[StyleTracker::Style::STROKE_DASHARRAY] = attr.getValue();
+    return diff;
+  }
+  StyleDiff visit_style(const svg::style &attr) {
+    StyleDiff diff;
+    std::string_view content{attr.cstrOrNull()};
+    while (content.size()) {
+      size_t end = content.find(';');
+      std::string_view decl;
+      if (end == content.npos) {
+        decl = content;
+        content = nullptr;
+      } else {
+        decl = content.substr(0, end);
+        content = content.substr(end + 1);
+      }
+      size_t split = decl.find(':');
+      if (split == decl.npos)
+        continue;
+      std::string_view name = strview_trim(decl.substr(0, split));
+      std::string_view value = strview_trim(decl.substr(split + 1));
+      diff.extend(parseStyleDeclaration(name, value));
+    }
+    return diff;
+  }
+  StyleDiff visit_text_anchor(const svg::text_anchor &attr) {
+    StyleDiff diff;
+    diff.styles[StyleTracker::Style::TEXT_ANCHOR] = attr.getValue();
+    return diff;
+  }
+  StyleDiff visit_width(const svg::width &attr) {
+    StyleDiff diff;
+    diff.styles[StyleTracker::Style::WIDTH] = attr.getValue();
+    return diff;
+  }
 };
-
-StyleTracker::StyleDiff StyleParser::visit_color(const svg::color &attr) {
-  StyleDiff diff;
-  diff.styles[StyleTracker::Style::COLOR] = attr.getValue();
-  return diff;
-}
-StyleTracker::StyleDiff
-StyleParser::visit_font_family(const svg::font_family &attr) {
-  StyleDiff diff;
-  diff.styles[StyleTracker::Style::FONT_FAMILY] = attr.getValue();
-  return diff;
-}
-StyleTracker::StyleDiff
-StyleParser::visit_font_size(const svg::font_size &attr) {
-  StyleDiff diff;
-  diff.styles[StyleTracker::Style::FONT_SIZE] = attr.getValue();
-  return diff;
-}
-StyleTracker::StyleDiff StyleParser::visit_fill(const svg::fill &attr) {
-  StyleDiff diff;
-  diff.styles[StyleTracker::Style::FILL] = attr.getValue();
-  return diff;
-}
-StyleTracker::StyleDiff StyleParser::visit_stroke(const svg::stroke &attr) {
-  StyleDiff diff;
-  diff.styles[StyleTracker::Style::STROKE] = attr.getValue();
-  return diff;
-}
-StyleTracker::StyleDiff
-StyleParser::visit_stroke_width(const svg::stroke_width &attr) {
-  StyleDiff diff;
-  diff.styles[StyleTracker::Style::STROKE_WIDTH] = attr.getValue();
-  return diff;
-}
-StyleTracker::StyleDiff
-StyleParser::visit_stroke_dasharray(const svg::stroke_dasharray &attr) {
-  StyleDiff diff;
-  diff.styles[StyleTracker::Style::STROKE_DASHARRAY] = attr.getValue();
-  return diff;
-}
-StyleTracker::StyleDiff
-StyleParser::visit_text_anchor(const svg::text_anchor &attr) {
-  StyleDiff diff;
-  diff.styles[StyleTracker::Style::TEXT_ANCHOR] = attr.getValue();
-  return diff;
-}
 
 StyleTracker::StyleDiff
 StyleParser::parseStyles(const StyleTracker::AttrContainer &attrs) {
@@ -384,6 +431,21 @@ CSSColor StyleTracker::getFill() const {
     return CSSColor::parse(CurrentStyle.at(Style::FILL));
   return getColor();
 }
+std::string_view StyleTracker::getFontFamily() const {
+  if (CurrentStyle.count(Style::FONT_FAMILY))
+    return CurrentStyle.at(Style::FONT_FAMILY);
+  return std::string_view();
+}
+CSSUnit StyleTracker::getFontSize() const {
+  if (CurrentStyle.count(Style::FONT_SIZE))
+    return CSSUnit::parse(CurrentStyle.at(Style::FONT_SIZE));
+  return CSSUnit();
+}
+CSSUnit StyleTracker::getHeight() const {
+  if (CurrentStyle.count(Style::HEIGHT))
+    return CSSUnit::parse(CurrentStyle.at(Style::HEIGHT));
+  return CSSUnit();
+}
 CSSColor StyleTracker::getStroke() const {
   if (CurrentStyle.count(Style::STROKE))
     return CSSColor::parse(CurrentStyle.at(Style::STROKE));
@@ -399,16 +461,6 @@ CSSDashArray StyleTracker::getStrokeDasharray() const {
     return CSSDashArray::parse(CurrentStyle.at(Style::STROKE_DASHARRAY));
   return CSSDashArray();
 }
-std::string_view StyleTracker::getFontFamily() const {
-  if (CurrentStyle.count(Style::FONT_FAMILY))
-    return CurrentStyle.at(Style::FONT_FAMILY);
-  return std::string_view();
-}
-CSSUnit StyleTracker::getFontSize() const {
-  if (CurrentStyle.count(Style::FONT_SIZE))
-    return CSSUnit::parse(CurrentStyle.at(Style::FONT_SIZE));
-  return CSSUnit();
-}
 CSSTextAnchor StyleTracker::getTextAnchor() const {
   if (CurrentStyle.count(Style::TEXT_ANCHOR)) {
     auto anchorStr = CurrentStyle.at(Style::TEXT_ANCHOR);
@@ -420,4 +472,9 @@ CSSTextAnchor StyleTracker::getTextAnchor() const {
       return CSSTextAnchor::END;
   }
   return CSSTextAnchor::START;
+}
+CSSUnit StyleTracker::getWidth() const {
+  if (CurrentStyle.count(Style::WIDTH))
+    return CSSUnit::parse(CurrentStyle.at(Style::WIDTH));
+  return CSSUnit();
 }
