@@ -107,13 +107,14 @@ private:
 struct TestResult {
   TestResult() = delete;
   template <typename T1, typename T2>
-  TestResult(int status, T1 &&stdout, T2 &&stderr)
-      : status(status), stdout(std::forward<T1>(stdout)),
+  TestResult(std::string command, int status, T1 &&stdout, T2 &&stderr)
+      : command(command), status(status), stdout(std::forward<T1>(stdout)),
         stderr(std::forward<T2>(stderr)) {}
   TestResult(const TestResult &) = delete;
   TestResult &operator=(const TestResult &) = delete;
   TestResult(TestResult &&) = default;
   TestResult &operator=(TestResult &&) = default;
+  std::string command;
   int status;
   std::string stdout, stderr;
 };
@@ -314,11 +315,12 @@ static error_or<TestResults> run_test(const fs::path &testpath,
     if (exebuf->status()) {
       std::stringstream msg;
       msg << "Exited with code " << exebuf->status() << '\n'
+          << "Command was: " << subst << '\n'
           << "stdout: " << stdout << '\n'
           << "stderr: " << stderr << '\n';
       return error(testpath, msg.str());
     }
-    results.emplace_back(exebuf->status(), std::move(stdout),
+    results.emplace_back(subst, exebuf->status(), std::move(stdout),
                          std::move(stderr));
   }
   return results;
