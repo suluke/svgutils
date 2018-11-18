@@ -157,9 +157,7 @@ CairoSVGWriter &CairoSVGWriter::content(const char *text) {
   return *this;
 }
 
-CairoSVGWriter &CairoSVGWriter::comment(const char *comment) {
-  return *this;
-}
+CairoSVGWriter &CairoSVGWriter::comment(const char *comment) { return *this; }
 
 CairoSVGWriter &CairoSVGWriter::enter() {
   assert(currentTag != TagType::NONE && "Cannot enter without root tag");
@@ -266,6 +264,15 @@ static CSSUnit CSSUnitFrom(const SVGAttribute &attr) {
   return res;
 }
 
+void CairoSVGWriter::applyCommonCSS() {
+  CSSColor fg = styles.getStroke();
+  CSSColor bg = styles.getFill();
+  cairo_set_source_rgba(cairo.get(), fg.r, fg.g, fg.b, fg.a);
+  cairo_stroke_preserve(cairo.get());
+  cairo_set_source_rgba(cairo.get(), bg.r, bg.g, bg.b, bg.a);
+  cairo_fill(cairo.get());
+}
+
 CairoSVGWriter &CairoSVGWriter::a(const CairoSVGWriter::AttrContainer &attrs) {
   openTag(TagType::a, attrs);
   return *this;
@@ -322,9 +329,7 @@ CairoSVGWriter::circle(const CairoSVGWriter::AttrContainer &attrs) {
     attrParser.visit(Attr);
   cairo_arc(cairo.get(), convertCSSWidth(cx), convertCSSHeight(cy),
             convertCSSWidth(r), 0., 2 * M_PI);
-  CSSColor bg = styles.getFill();
-  cairo_set_source_rgba(cairo.get(), bg.r, bg.g, bg.b, bg.a);
-  cairo_fill(cairo.get());
+  applyCommonCSS();
   return *this;
 }
 CairoSVGWriter &
@@ -672,26 +677,19 @@ CairoSVGWriter::radialGradient(const CairoSVGWriter::AttrContainer &attrs) {
 CairoSVGWriter &
 CairoSVGWriter::rect(const CairoSVGWriter::AttrContainer &attrs) {
   openTag(TagType::rect, attrs);
-  CSSUnit x, y, width, height;
+  CSSUnit x, y, width = styles.getWidth(), height = styles.getHeight();
   struct AttrParser : public SVGAttributeVisitor<AttrParser> {
-    AttrParser(CSSUnit &x, CSSUnit &y, CSSUnit &width, CSSUnit &height)
-        : x(x), y(y), width(width), height(height) {}
+    AttrParser(CSSUnit &x, CSSUnit &y) : x(x), y(y) {}
     void visit_x(const svg::x &xAttr) { x = CSSUnitFrom(xAttr); }
     void visit_y(const svg::y &yAttr) { y = CSSUnitFrom(yAttr); }
-    void visit_width(const svg::width &w) { width = CSSUnitFrom(w); }
-    void visit_height(const svg::height &h) { height = CSSUnitFrom(h); }
     CSSUnit &x;
     CSSUnit &y;
-    CSSUnit &width;
-    CSSUnit &height;
-  } attrParser(x, y, width, height);
+  } attrParser(x, y);
   for (const SVGAttribute &Attr : attrs)
     attrParser.visit(Attr);
   cairo_rectangle(cairo.get(), convertCSSWidth(x), convertCSSHeight(y),
                   convertCSSWidth(width), convertCSSHeight(height));
-  const CSSColor bg = styles.getFill();
-  cairo_set_source_rgba(cairo.get(), bg.r, bg.g, bg.b, bg.a);
-  cairo_fill(cairo.get());
+  applyCommonCSS();
   return *this;
 }
 CairoSVGWriter &

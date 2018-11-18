@@ -80,6 +80,7 @@ private:
   double getHeight() const { return height ? height : dfltHeight; }
   double convertCSSWidth(const CSSUnit &unit) const;
   double convertCSSHeight(const CSSUnit &unit) const;
+  void applyCommonCSS();
   void initCairo();
 };
 } // namespace svg
