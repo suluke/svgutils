@@ -31,14 +31,22 @@ int main(int argc, const char **argv) {
     CairoSVGWriter &cairo = Reader.getWriter();
     cairo.setDefaultWidth(DefaultWidth);
     cairo.setDefaultHeight(DefaultHeight);
-    Reader.parse(in);
+    if (auto err_opt = Reader.parse(in)) {
+      std::cerr << "An Error occurred\n";
+      std::cerr << *err_opt << '\n';
+      return 1;
+    }
   } else {
     if (!Width || !Height) {
       std::cerr << "PNG dimension zero or not set" << std::endl;
       return 1;
     }
     SVGReaderWriter<CairoSVGWriter> Reader(Outfile, CairoSVGWriter::PNG, Width, Height);
-    Reader.parse(in);
+    if (auto err_opt = Reader.parse(in)) {
+      std::cerr << "An Error occurred\n";
+      std::cerr << *err_opt << '\n';
+      return 1;
+    }
   }
   return 0;
 }
