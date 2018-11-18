@@ -1,6 +1,9 @@
 set(TEDISEX_IGNORE_PATTERNS "Inputs/" "CMakeLists.txt")
 set(TEDISEX_CONSIDER_PATTERNS ".svg" ".test" ".txt")
 set(TEDISEX_FEATURES ${CMAKE_BUILD_TYPE})
+if (SVG_UTILS_WITH_CAIRO)
+  list(APPEND TEDISEX_FEATURES "Cairo")
+endif()
 add_svgutils_config(tedisex_config.h.in)
 
 add_svg_util(tedisex tedisex.cc)
