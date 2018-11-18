@@ -17,19 +17,21 @@
 using namespace svg;
 namespace fs = std::filesystem;
 
-static cl::list<fs::path> Testsuites(cl::meta("Tests"));
-static cl::opt<fs::path> Outdir(cl::name("outdir"), cl::name("o"),
-                                cl::init(fs::path("./tedisex")));
-static cl::list<std::string> Ignore(cl::name("ignore"), cl::name("i"),
-                                    cl::init(TEDISEX_IGNORE_PATTERNS));
 static cl::list<std::string> Consider(cl::name("filter"),
                                       cl::init(TEDISEX_CONSIDER_PATTERNS));
 static cl::list<std::string> Defs(cl::name("param"), cl::name("D"));
-static cl::opt<unsigned> Timeout(cl::name("timeout"), cl::init(0));
+static cl::list<std::string> Ignore(cl::name("ignore"), cl::name("i"),
+                                    cl::init(TEDISEX_IGNORE_PATTERNS));
+static cl::opt<fs::path> Outdir(cl::name("outdir"), cl::name("o"),
+                                cl::init(fs::path("./tedisex")));
 static cl::opt<bool> Recurse(cl::name("recursive"), cl::name("r"),
                              cl::init(true));
+static cl::list<fs::path> Testsuites(cl::meta("Tests"));
 static cl::opt<unsigned> Threads(cl::name("threads"), cl::name("j"),
                                  cl::init(std::thread::hardware_concurrency()));
+static cl::opt<unsigned> Timeout(cl::name("timeout"), cl::init(0));
+static cl::opt<bool> Verbose(cl::name("verbose"), cl::name("v"),
+                             cl::init(false));
 
 static const char *TOOLNAME = "tedisex";
 static const char *TOOLDESC = "TEst DIScovery and EXecution tool";
@@ -105,27 +107,79 @@ private:
 
 /// The observable results from running a single command line of a Test
 struct TestResult {
+  enum Type { PASS, XFAIL, XPASS, FAIL, UNRESOLVED, UNSUPPORTED };
+  friend inline std::ostream &operator<<(std::ostream &os, Type type) {
+    switch (type) {
+    case PASS:
+      os << "[PASS       ]";
+      break;
+    case XFAIL:
+      os << "[XFAIL      ]";
+      break;
+    case XPASS:
+      os << "[XPASS      ]";
+      break;
+    case FAIL:
+      os << "[FAIL       ]";
+      break;
+    case UNRESOLVED:
+      os << "[UNRESOLVED ]";
+      break;
+    case UNSUPPORTED:
+      os << "[UNSUPPORTED]";
+      break;
+    };
+    return os;
+  }
+
   TestResult() = delete;
   template <typename T1, typename T2>
-  TestResult(std::string command, int status, T1 &&stdout, T2 &&stderr)
-      : command(command), status(status), stdout(std::forward<T1>(stdout)),
-        stderr(std::forward<T2>(stderr)) {}
+  TestResult(Type type, std::string command, int status, T1 &&stdout,
+             T2 &&stderr)
+      : type(type), command(command), status(status),
+        stdout(std::forward<T1>(stdout)), stderr(std::forward<T2>(stderr)) {}
   TestResult(const TestResult &) = delete;
   TestResult &operator=(const TestResult &) = delete;
   TestResult(TestResult &&) = default;
   TestResult &operator=(TestResult &&) = default;
+
+  Type type;
   std::string command;
   int status;
   std::string stdout, stderr;
+
+  friend inline std::ostream &operator<<(std::ostream &os,
+                                         const TestResult &res) {
+    os << res.type << "\n  Command: " << res.command << '\n'
+       << "  Exit code: " << res.status << '\n'
+       << "  <<<<<<<<<<<<<<<<<<Stdout>>>>>>>>>>>>>>>>>>\n"
+       << res.stdout << '\n'
+       << "  <<<<<<<<<<<<<<<<END Stdout>>>>>>>>>>>>>>>>\n"
+       << "  <<<<<<<<<<<<<<<<<<Stderr>>>>>>>>>>>>>>>>>>\n"
+       << res.stderr << '\n'
+       << "  <<<<<<<<<<<<<<<<END Stderr>>>>>>>>>>>>>>>>\n";
+    return os;
+  }
 };
 /// A simple container class to hold a TestResult for each of a Test's
 /// RUN lines.
 struct TestResults {
+  fs::path test;
+  std::vector<TestResult> results;
+
   template <typename... args_t> void emplace_back(args_t &&... args) {
     results.emplace_back(std::forward<args_t>(args)...);
   }
-  fs::path test;
-  std::vector<TestResult> results;
+  auto begin() { return results.begin(); }
+  auto end() { return results.end(); }
+  auto begin() const { return results.begin(); }
+  auto end() const { return results.end(); }
+  friend inline std::ostream &operator<<(std::ostream &os,
+                                         const TestResults &results) {
+    for (const auto &res : results)
+      os << res;
+    return os;
+  }
 };
 
 /// Responsible for assigning the temp-file (%t/%T) path to tests.
@@ -320,8 +374,8 @@ static error_or<TestResults> run_test(const fs::path &testpath,
           << "stderr: " << stderr << '\n';
       return error(testpath, msg.str());
     }
-    results.emplace_back(subst, exebuf->status(), std::move(stdout),
-                         std::move(stderr));
+    results.emplace_back(TestResult::PASS, subst, exebuf->status(),
+                         std::move(stdout), std::move(stderr));
   }
   return results;
 }
@@ -339,6 +393,8 @@ static bool run_tests(const std::vector<fs::path> &tests) {
       if (!testresult) {
         testresult.to_error().print(std::cerr);
         success = false;
+      } else if (Verbose) {
+        std::cerr << *testresult;
       }
     }
   else {
@@ -362,6 +418,9 @@ static bool run_tests(const std::vector<fs::path> &tests) {
           std::lock_guard<std::mutex> lock{outstream_mutex};
           testresult.to_error().print(std::cerr);
           success = false;
+        } else if (Verbose) {
+          std::lock_guard<std::mutex> lock{outstream_mutex};
+          std::cerr << *testresult;
         }
       }
     };
