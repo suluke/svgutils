@@ -38,6 +38,7 @@ struct CSSColor {
   void clamp();
   CSSColor hsl2rgb() const;
   CSSColor rgb2hsl() const;
+  operator bool() const { return a != 0.; }
 
   friend inline std::ostream &operator<<(std::ostream &os,
                                          const CSSColor &col) {

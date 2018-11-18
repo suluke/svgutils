@@ -72,8 +72,8 @@ CairoSVGWriter &CairoSVGWriter::content(const char *text) {
     svg_unreachable("Cairo is in an invalid state");
 
   // Collect the style information
-  CSSUnit cssSize = styles.getFontSize();
-  double fontSize = convertCSSWidth(cssSize);
+  CSSUnit cssFontSize = styles.getFontSize();
+  double fontSize = convertCSSWidth(cssFontSize);
   CSSColor color = styles.getFill();
   std::string fontPattern(styles.getFontFamily());
   CSSTextAnchor anchor = styles.getTextAnchor();
@@ -142,6 +142,24 @@ CairoSVGWriter &CairoSVGWriter::content(const char *text) {
                          clusters.get(), num_clusters, cluster_flags);
   if (cairo_status(cairo.get()))
     svg_unreachable("Error drawing text glyphs");
+  // Render stroke
+  CSSUnit cssStrokeWidth = styles.getStrokeWidth();
+  double strokeWidth = convertCSSWidth(cssStrokeWidth);
+  CSSColor strokeColor = styles.getStroke();
+  if (strokeWidth != 0. && strokeColor) {
+    cairo_glyph_path(cairo.get(), glyphs.get(), num_glyphs);
+    // Apply styles
+    const CSSDashArray strokeDasharray = styles.getStrokeDasharray();
+    std::vector<double> dashes;
+    for (const CSSUnit &len : strokeDasharray.dashes)
+      dashes.emplace_back(convertCSSWidth(len));
+    // FIXME look up what percentages mean in stroke-width
+    cairo_set_dash(cairo.get(), dashes.data(), dashes.size(), 0.);
+    cairo_set_line_width(cairo.get(), strokeWidth);
+    cairo_set_source_rgba(cairo.get(), strokeColor.r, strokeColor.g,
+                          strokeColor.b, strokeColor.a);
+    cairo_stroke(cairo.get());
+  }
 
   // Move the drawing pencil to the end of the text
   cairo_glyph_t *last_glyph = &glyphs.get()[num_glyphs - 1];
