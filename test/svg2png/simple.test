@@ -1,0 +1,2 @@
+RUN: tools/svg2png/svg2png -o %t %S%{pathsep}..%{pathsep}Inputs%{pathsep}simple.svg
+REQUIRES: Cairo
