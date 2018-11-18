@@ -45,7 +45,7 @@ struct error {
   error &operator=(const error &) = default;
   error &operator=(error &&) = default;
 
-  void print(std::ostream &os) {
+  void print(std::ostream &os) const {
     os << "Error in test " << test << ":\n" << msg << '\n';
   }
 
@@ -148,6 +148,10 @@ struct TestResult {
   int status;
   std::string stdout, stderr;
 
+  operator bool() const {
+    return type == PASS || type == XFAIL || type == UNSUPPORTED;
+  }
+
   friend inline std::ostream &operator<<(std::ostream &os,
                                          const TestResult &res) {
     os << res.type << "\n  Command: " << res.command << '\n'
@@ -164,8 +168,21 @@ struct TestResult {
 /// A simple container class to hold a TestResult for each of a Test's
 /// RUN lines.
 struct TestResults {
+private:
   fs::path test;
   std::vector<TestResult> results;
+  std::optional<error> err;
+
+public:
+  explicit TestResults(const fs::path &test) : test(test) {}
+  TestResults(const fs::path &test, const error &err) : test(test), err(err) {}
+  TestResults() = delete;
+  TestResults(const TestResults &) = default;
+  TestResults &operator=(const TestResults &) = default;
+  TestResults(TestResults &&) = default;
+  TestResults &operator=(TestResults &&) = default;
+
+  const fs::path &getTestPath() const { return test; }
 
   template <typename... args_t> void emplace_back(args_t &&... args) {
     results.emplace_back(std::forward<args_t>(args)...);
@@ -174,10 +191,26 @@ struct TestResults {
   auto end() { return results.end(); }
   auto begin() const { return results.begin(); }
   auto end() const { return results.end(); }
+  /// Indicates success.
+  /// True if the TestSuite has been executed
+  operator bool() const {
+    if (err)
+      return false;
+    for (const auto &res : results) {
+      if (!res)
+        return false;
+    }
+    return true;
+  }
   friend inline std::ostream &operator<<(std::ostream &os,
                                          const TestResults &results) {
-    for (const auto &res : results)
-      os << res;
+    if (results.err) {
+      os << TestResult::UNRESOLVED << results.getTestPath() << "\n  ";
+      results.err->print(os);
+      os << '\n';
+    } else
+      for (const auto &res : results)
+        os << res;
     return os;
   }
 };
@@ -321,22 +354,20 @@ static error_or<std::string> substitute_vars(const std::string_view &str,
 }
 
 /// Parses and executes a test.
-static error_or<TestResults> run_test(const fs::path &testpath,
-                                      TempManager &tempman) {
+static TestResults run_test(const fs::path &testpath, TempManager &tempman) {
   auto test_or_error = parse_test(testpath);
   if (!test_or_error)
-    return std::move(test_or_error.to_error());
+    return TestResults(testpath, test_or_error.to_error());
   const Test &test = *test_or_error;
   if (test.run.empty())
-    return error(testpath, "Test has no RUN lines");
+    return TestResults(testpath, error(testpath, "Test has no RUN lines"));
   // TODO check that current configuration matches xfail/required/unsupported
   using namespace redi;
-  TestResults results;
-  results.test = testpath;
+  TestResults results{testpath};
   for (const std::string &cmd : test.run) {
     auto subst_or_error = substitute_vars(cmd, testpath, tempman);
     if (!subst_or_error)
-      return subst_or_error.to_error();
+      return TestResults(testpath, subst_or_error.to_error());
     const std::string &subst = *subst_or_error;
     ipstream exe(subst, pstreams::pstdout | pstreams::pstderr);
     std::array<char, 1024> buf;
@@ -366,16 +397,12 @@ static error_or<TestResults> run_test(const fs::path &testpath,
     }
     exe.close();
     pstreambuf *exebuf = exe.rdbuf();
+    TestResult::Type ResultTy = TestResult::PASS;
     if (exebuf->status()) {
-      std::stringstream msg;
-      msg << "Exited with code " << exebuf->status() << '\n'
-          << "Command was: " << subst << '\n'
-          << "stdout: " << stdout << '\n'
-          << "stderr: " << stderr << '\n';
-      return error(testpath, msg.str());
+      ResultTy = TestResult::FAIL;
     }
-    results.emplace_back(TestResult::PASS, subst, exebuf->status(),
-                         std::move(stdout), std::move(stderr));
+    results.emplace_back(ResultTy, subst, exebuf->status(), std::move(stdout),
+                         std::move(stderr));
   }
   return results;
 }
@@ -391,10 +418,10 @@ static bool run_tests(const std::vector<fs::path> &tests) {
     for (const fs::path &test : tests) {
       auto testresult = run_test(test, tmpman);
       if (!testresult) {
-        testresult.to_error().print(std::cerr);
+        std::cerr << testresult;
         success = false;
       } else if (Verbose) {
-        std::cerr << *testresult;
+        std::cerr << testresult;
       }
     }
   else {
@@ -416,11 +443,11 @@ static bool run_tests(const std::vector<fs::path> &tests) {
         auto testresult = run_test(*test, tmpman);
         if (!testresult) {
           std::lock_guard<std::mutex> lock{outstream_mutex};
-          testresult.to_error().print(std::cerr);
+          std::cerr << testresult;
           success = false;
         } else if (Verbose) {
           std::lock_guard<std::mutex> lock{outstream_mutex};
-          std::cerr << *testresult;
+          std::cerr << testresult;
         }
       }
     };
