@@ -1,4 +1,5 @@
 #include "svgcairo/svg_cairo.h"
+#include <algorithm>
 #include <cairo/cairo-ft.h>
 #include <cairo/cairo-pdf.h>
 #include <cmath>
@@ -148,17 +149,7 @@ CairoSVGWriter &CairoSVGWriter::content(const char *text) {
   CSSColor strokeColor = styles.getStroke();
   if (strokeWidth != 0. && strokeColor) {
     cairo_glyph_path(cairo.get(), glyphs.get(), num_glyphs);
-    // Apply styles
-    const CSSDashArray strokeDasharray = styles.getStrokeDasharray();
-    std::vector<double> dashes;
-    for (const CSSUnit &len : strokeDasharray.dashes)
-      dashes.emplace_back(convertCSSWidth(len));
-    // FIXME look up what percentages mean in stroke-width
-    cairo_set_dash(cairo.get(), dashes.data(), dashes.size(), 0.);
-    cairo_set_line_width(cairo.get(), strokeWidth);
-    cairo_set_source_rgba(cairo.get(), strokeColor.r, strokeColor.g,
-                          strokeColor.b, strokeColor.a);
-    cairo_stroke(cairo.get());
+    applyCSSStroke(false);
   }
 
   // Move the drawing pencil to the end of the text
@@ -282,13 +273,47 @@ static CSSUnit CSSUnitFrom(const SVGAttribute &attr) {
   return res;
 }
 
-void CairoSVGWriter::applyCommonCSS() {
-  CSSColor fg = styles.getStroke();
+void CairoSVGWriter::applyCSSStroke(bool preserve) {
+  // Render stroke
+  CSSUnit cssStrokeWidth = styles.getStrokeWidth();
+  double strokeWidth = convertCSSWidth(cssStrokeWidth);
+  CSSColor strokeColor = styles.getStroke();
+  if (strokeWidth != 0. && strokeColor) {
+    // Apply styles
+    const CSSDashArray strokeDasharray = styles.getStrokeDasharray();
+    std::vector<double> dashes;
+    for (const CSSUnit &len : strokeDasharray.dashes)
+      dashes.emplace_back(convertCSSWidth(len));
+    // FIXME look up what percentages mean in stroke-width
+    cairo_set_dash(cairo.get(), dashes.data(), dashes.size(), 0.);
+    cairo_set_line_width(cairo.get(), strokeWidth);
+    cairo_set_source_rgba(cairo.get(), strokeColor.r, strokeColor.g,
+                          strokeColor.b, strokeColor.a);
+    if (preserve)
+      cairo_stroke_preserve(cairo.get());
+    else
+      cairo_stroke(cairo.get());
+  } else if (!preserve)
+    cairo_new_path(cairo.get());
+}
+
+void CairoSVGWriter::applyCSSFill(bool preserve) {
   CSSColor bg = styles.getFill();
-  cairo_set_source_rgba(cairo.get(), fg.r, fg.g, fg.b, fg.a);
-  cairo_stroke_preserve(cairo.get());
+  if (!bg) {
+    if (!preserve)
+      cairo_new_path(cairo.get());
+    return;
+  }
   cairo_set_source_rgba(cairo.get(), bg.r, bg.g, bg.b, bg.a);
-  cairo_fill(cairo.get());
+  if (preserve)
+    cairo_fill_preserve(cairo.get());
+  else
+    cairo_fill(cairo.get());
+}
+
+void CairoSVGWriter::applyCSSFillAndStroke(bool preserve) {
+  applyCSSStroke(true);
+  applyCSSFill(preserve);
 }
 
 CairoSVGWriter &CairoSVGWriter::a(const CairoSVGWriter::AttrContainer &attrs) {
@@ -347,7 +372,7 @@ CairoSVGWriter::circle(const CairoSVGWriter::AttrContainer &attrs) {
     attrParser.visit(Attr);
   cairo_arc(cairo.get(), convertCSSWidth(cx), convertCSSHeight(cy),
             convertCSSWidth(r), 0., 2 * M_PI);
-  applyCommonCSS();
+  applyCSSFillAndStroke(false);
   return *this;
 }
 CairoSVGWriter &
@@ -602,19 +627,9 @@ CairoSVGWriter::line(const CairoSVGWriter::AttrContainer &attrs) {
   } attrParser(x1, y1, x2, y2);
   for (const SVGAttribute &Attr : attrs)
     attrParser.visit(Attr);
-  const CSSColor color = styles.getStroke();
-  const CSSUnit strokeWidth = styles.getStrokeWidth();
-  const CSSDashArray strokeDasharray = styles.getStrokeDasharray();
-  std::vector<double> dashes;
-  for (const CSSUnit &len : strokeDasharray.dashes)
-    dashes.emplace_back(convertCSSWidth(len));
-  cairo_set_source_rgba(cairo.get(), color.r, color.g, color.b, color.a);
-  // FIXME look up what percentages mean in stroke-width
-  cairo_set_dash(cairo.get(), dashes.data(), dashes.size(), 0.);
-  cairo_set_line_width(cairo.get(), convertCSSWidth(strokeWidth));
   cairo_move_to(cairo.get(), convertCSSWidth(x1), convertCSSHeight(y1));
   cairo_line_to(cairo.get(), convertCSSWidth(x2), convertCSSHeight(y2));
-  cairo_stroke(cairo.get());
+  applyCSSStroke(false);
   return *this;
 }
 CairoSVGWriter &
@@ -667,9 +682,192 @@ CairoSVGWriter::mpath(const CairoSVGWriter::AttrContainer &attrs) {
   openTag(TagType::mpath, attrs);
   return *this;
 }
+
+bool CairoSVGWriter::CairoExecuteHLine(std::string_view length, bool rel) {
+  double X, Y;
+  cairo_get_current_point(cairo.get(), &X, &Y);
+  while (length.size()) {
+    auto End = std::find_if(length.begin(), length.end(),
+                            [](char C) { return C == ',' || std::isspace(C); });
+    std::string_view lenStr = length.substr(0, End - length.begin());
+    if (End == length.end())
+      length.remove_prefix(length.size());
+    else
+      length.remove_prefix((End - length.begin()) + 1);
+    CSSUnit lenCss = CSSUnit::parse(lenStr);
+    double len = convertCSSWidth(lenCss);
+    if (rel)
+      cairo_rel_line_to(cairo.get(), len, 0);
+    else
+      cairo_line_to(cairo.get(), len, Y);
+  }
+  return true;
+}
+bool CairoSVGWriter::CairoExecuteVLine(std::string_view length, bool rel) {
+  double X, Y;
+  cairo_get_current_point(cairo.get(), &X, &Y);
+  while (length.size()) {
+    auto End = std::find_if(length.begin(), length.end(),
+                            [](char C) { return C == ',' || std::isspace(C); });
+    std::string_view lenStr = length.substr(0, End - length.begin());
+    if (End == length.end())
+      length.remove_prefix(length.size());
+    else
+      length.remove_prefix((End - length.begin()) + 1);
+    CSSUnit lenCss = CSSUnit::parse(lenStr);
+    double len = convertCSSHeight(lenCss);
+    if (rel)
+      cairo_rel_line_to(cairo.get(), 0, len);
+    else
+      cairo_line_to(cairo.get(), X, len);
+  }
+  return true;
+}
+
+bool CairoSVGWriter::CairoExecuteLineTo(std::string_view points, bool rel) {
+  while (points.size()) {
+    auto xEnd = std::find_if(points.begin(), points.end(), [](char C) {
+      return C == ',' || std::isspace(C);
+    });
+    if (xEnd == points.end())
+      return false; // Error: No y value given
+    std::string_view xStr = points.substr(0, xEnd - points.begin());
+    points.remove_prefix((xEnd - points.begin()) + 1);
+    auto yEnd = std::find_if(points.begin(), points.end(),
+                             [](char C) { return C == std::isspace(C); });
+    std::string_view yStr = points.substr(0, yEnd - points.begin());
+    if (yEnd == points.end())
+      points.remove_prefix(points.size());
+    else
+      points.remove_prefix((yEnd - points.begin()) + 1);
+    points = strview_trim(points);
+    CSSUnit xCss = CSSUnit::parse(xStr);
+    CSSUnit yCss = CSSUnit::parse(yStr);
+    double x = convertCSSWidth(xCss);
+    double y = convertCSSHeight(yCss);
+    if (rel)
+      cairo_rel_line_to(cairo.get(), x, y);
+    else
+      cairo_line_to(cairo.get(), x, y);
+  }
+  return true;
+}
+bool CairoSVGWriter::CairoExecuteMoveTo(std::string_view points, bool rel) {
+  if (points.empty())
+    return true;
+  auto xEnd = std::find_if(points.begin(), points.end(),
+                           [](char C) { return C == ',' || std::isspace(C); });
+  if (xEnd == points.end())
+    return false; // Error: No y value given
+  std::string_view xStr = points.substr(0, xEnd - points.begin());
+  points.remove_prefix((xEnd - points.begin()) + 1);
+  auto yEnd = std::find_if(points.begin(), points.end(),
+                           [](char C) { return C == std::isspace(C); });
+  std::string_view yStr = points.substr(0, yEnd - points.begin());
+  if (yEnd == points.end())
+    points.remove_prefix(points.size());
+  else
+    points.remove_prefix((yEnd - points.begin()) + 1);
+  points = strview_trim(points);
+  CSSUnit xCss = CSSUnit::parse(xStr);
+  CSSUnit yCss = CSSUnit::parse(yStr);
+  double x = convertCSSWidth(xCss);
+  double y = convertCSSHeight(yCss);
+  if (rel)
+    cairo_rel_move_to(cairo.get(), x, y);
+  else
+    cairo_move_to(cairo.get(), x, y);
+  CairoExecuteLineTo(points, rel);
+  return true;
+}
+
+bool CairoSVGWriter::CairoExecutePath(const char *pathRaw) {
+  std::string_view path = strview_trim(pathRaw);
+  const char commands[] = "MmLlHhVvCcSsQqTtAaZz";
+  // Invariant: There is always non-whitespace content in path and path is
+  // trimmed
+  while (path.size()) {
+    auto cmdpos = path.find_first_of(commands);
+    if (cmdpos == path.npos)
+      return false; // Error: There was content but no valid command
+    char cmd = path[cmdpos];
+    path.remove_prefix(cmdpos + 1);
+    auto argsEnd = path.find_first_of(commands);
+    std::string_view args = path.substr(0, argsEnd);
+    args = strview_trim(args);
+    if (argsEnd == path.npos)
+      path.remove_prefix(path.size());
+    else
+      path.remove_prefix(argsEnd);
+    switch (cmd) {
+    case 'M':
+      CairoExecuteMoveTo(args, false);
+      break;
+    case 'm':
+      CairoExecuteMoveTo(args, true);
+      break;
+    case 'L':
+      CairoExecuteLineTo(args, false);
+      break;
+    case 'l':
+      CairoExecuteLineTo(args, true);
+      break;
+    case 'H':
+      CairoExecuteHLine(args, false);
+      break;
+    case 'h':
+      CairoExecuteHLine(args, true);
+      break;
+    case 'V':
+      CairoExecuteVLine(args, false);
+      break;
+    case 'v':
+      CairoExecuteVLine(args, true);
+      break;
+    case 'C':
+      break;
+    case 'c':
+      break;
+    case 'S':
+      break;
+    case 's':
+      break;
+    case 'Q':
+      break;
+    case 'q':
+      break;
+    case 'T':
+      break;
+    case 't':
+      break;
+    case 'A':
+      break;
+    case 'a':
+      break;
+    case 'Z':
+      break;
+    case 'z':
+      break;
+    }
+  }
+  return true;
+}
+
 CairoSVGWriter &
 CairoSVGWriter::path(const CairoSVGWriter::AttrContainer &attrs) {
   openTag(TagType::path, attrs);
+  const SVGAttribute *pathDesc = nullptr;
+  struct AttrParser : public SVGAttributeVisitor<AttrParser> {
+    AttrParser(const SVGAttribute *&pathDesc) : pathDesc(pathDesc) {}
+    void visit_d(const svg::d &desc) { pathDesc = &desc; }
+    const SVGAttribute *&pathDesc;
+  } attrParser(pathDesc);
+  for (const SVGAttribute &Attr : attrs)
+    attrParser.visit(Attr);
+  if (!pathDesc)
+    return *this;
+  CairoExecutePath(pathDesc->cstrOrNull());
+  applyCSSFillAndStroke(false);
   return *this;
 }
 CairoSVGWriter &
@@ -707,7 +905,7 @@ CairoSVGWriter::rect(const CairoSVGWriter::AttrContainer &attrs) {
     attrParser.visit(Attr);
   cairo_rectangle(cairo.get(), convertCSSWidth(x), convertCSSHeight(y),
                   convertCSSWidth(width), convertCSSHeight(height));
-  applyCommonCSS();
+  applyCSSFillAndStroke(false);
   return *this;
 }
 CairoSVGWriter &

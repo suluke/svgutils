@@ -1,5 +1,5 @@
 <!--
-RUN: tools/svg2png/svg2png -o %t %s
+RUN: tools/svg2png/svg2png -o %T/font-stroke.png %s
 REQUIRES: Cairo
 -->
 <svg xmlns="http://www.w3.org/2000/svg" baseProfile="full" version="1.1" width="300" height="200">

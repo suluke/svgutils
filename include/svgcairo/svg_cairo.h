@@ -80,8 +80,16 @@ private:
   double getHeight() const { return height ? height : dfltHeight; }
   double convertCSSWidth(const CSSUnit &unit) const;
   double convertCSSHeight(const CSSUnit &unit) const;
-  void applyCommonCSS();
+  void applyCSSFill(bool preserve);
+  void applyCSSStroke(bool preserve);
+  void applyCSSFillAndStroke(bool preserve);
   void initCairo();
+
+  bool CairoExecuteHLine(std::string_view length, bool rel);
+  bool CairoExecuteVLine(std::string_view length, bool rel);
+  bool CairoExecuteLineTo(std::string_view points, bool rel);
+  bool CairoExecuteMoveTo(std::string_view points, bool rel);
+  bool CairoExecutePath(const char *pathRaw);
 };
 } // namespace svg
 #endif // SVGCAIRO_SVG_CAIRO_H

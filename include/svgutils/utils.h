@@ -20,12 +20,13 @@ namespace svg {
   std::abort();
 }
 
-inline std::string_view strview_trim(std::string_view str) {
-  while (std::isspace(str.front()))
-    str = str.substr(1);
-  while (std::isspace(str.back()))
-    str = str.substr(0, str.size() - 1);
-  return str;
+inline std::string_view strview_trim(const std::string_view &str) {
+  std::string_view res = str;
+  while (std::isspace(res.front()))
+    res.remove_prefix(1);
+  while (std::isspace(res.back()))
+    res.remove_suffix(1);
+  return res;
 }
 
 inline std::optional<double> strview_to_double(std::string_view str) {
