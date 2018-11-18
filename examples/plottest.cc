@@ -1,4 +1,5 @@
 #include "svgplotlib/plotlib.h"
+#include "svgutils/svg_formatted_writer.h"
 #include <iostream>
 
 using namespace plots;

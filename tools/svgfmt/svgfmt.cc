@@ -1,4 +1,5 @@
 #include "svgutils/cli_args.h"
+#include "svgutils/svg_formatted_writer.h"
 #include "svgutils/svg_reader_writer.h"
 
 #include <filesystem>
