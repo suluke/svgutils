@@ -159,6 +159,8 @@ CSSColor CSSColor::rgb2hsl() const {
 }
 
 CSSColor CSSColor::parse(std::string_view str) {
+  if (str == "none")
+    return CSSColor(0., 0., 0., 0.);
   if (str.front() == '#')
     return parseHexColor(str);
   const auto front4 = str.substr(0, 4);
@@ -367,12 +369,12 @@ StyleTracker::StyleTracker() {
   initialStyles.styles = {
       {Style::COLOR, "black"},
       {Style::BACKGROUND_COLOR, "white"},
-      {Style::FILL, "transparent"},
+      {Style::FILL, "none"},
       {Style::FONT_FAMILY, "serif"},
       {Style::FONT_SIZE, "12px"},
       {Style::FONT_WEIGHT, "normal"},
       {Style::OPACITY, "1"},
-      {Style::STROKE, "black"},
+      {Style::STROKE, "none"},
       {Style::STROKE_DASHARRAY, "none"},
       {Style::STROKE_WIDTH, "1px"},
       {Style::TEXT_ANCHOR, "start"},

@@ -17,6 +17,14 @@ struct CSSColor {
   double b = 0.;
   double a = 1.;
 
+  CSSColor() = default;
+  CSSColor(const CSSColor &) = default;
+  CSSColor &operator=(const CSSColor &) = default;
+  CSSColor(CSSColor &&) = default;
+  CSSColor &operator=(CSSColor &&) = default;
+  CSSColor(double r, double g, double b, double a = 1.)
+      : r(r), g(g), b(b), a(a) {}
+
   double &operator[](size_t idx) {
     assert(idx >= 0 && idx < 4 &&
            "Tried accessing out-of-range color component");
