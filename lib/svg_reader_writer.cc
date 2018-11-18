@@ -1,5 +1,6 @@
 #include "svgutils/svg_reader_writer.h"
 
+#include <algorithm>
 #include <cctype>
 #include <sstream>
 
@@ -73,12 +74,23 @@ bool SVGReaderWriterBase::expect(instream_t &is,
   return true;
 }
 
+static void trim(std::string &str) {
+  str.erase(str.begin(), std::find_if(str.begin(), str.end(), [](int ch) {
+              return !std::isspace(ch);
+            }));
+  str.erase(std::find_if(str.rbegin(), str.rend(),
+                         [](int ch) { return !std::isspace(ch); })
+                .base(),
+            str.end());
+}
+
 MaybeError SVGReaderWriterBase::parseContent(instream_t &is) {
   std::stringstream content;
   content << Tok;
   for (is.get(Tok); !is.eof() && Tok != '<'; is.get(Tok))
     content << Tok;
   std::string cstr = content.str();
+  trim(cstr);
   if (cstr.empty())
     return ParseSuccess;
   writer.content(cstr.c_str());
