@@ -856,11 +856,13 @@ bool CairoSVGWriter::CairoExecutePath(const char *pathRaw) {
 CairoSVGWriter &
 CairoSVGWriter::path(const CairoSVGWriter::AttrContainer &attrs) {
   openTag(TagType::path, attrs);
-  const SVGAttribute *pathDesc = nullptr;
+  std::optional<SVGAttribute> pathDesc;
   struct AttrParser : public SVGAttributeVisitor<AttrParser> {
-    AttrParser(const SVGAttribute *&pathDesc) : pathDesc(pathDesc) {}
-    void visit_d(const svg::d &desc) { pathDesc = &desc; }
-    const SVGAttribute *&pathDesc;
+    AttrParser(std::optional<SVGAttribute> &pathDesc) : pathDesc(pathDesc) {}
+    void visit_d(const svg::d &desc) {
+      pathDesc = static_cast<SVGAttribute>(desc);
+    }
+    std::optional<SVGAttribute> &pathDesc;
   } attrParser(pathDesc);
   for (const SVGAttribute &Attr : attrs)
     attrParser.visit(Attr);

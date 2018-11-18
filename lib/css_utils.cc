@@ -282,42 +282,42 @@ struct StyleParser
   static StyleDiff parseStyles(const StyleTracker::AttrContainer &attrs);
   StyleDiff visit_color(const svg::color &attr) {
     StyleDiff diff;
-    diff.styles[StyleTracker::Style::COLOR] = attr.getValue();
+    diff.styles[StyleTracker::Style::COLOR] = attr.getValueStr();
     return diff;
   }
   StyleDiff visit_font_family(const svg::font_family &attr) {
     StyleDiff diff;
-    diff.styles[StyleTracker::Style::FONT_FAMILY] = attr.getValue();
+    diff.styles[StyleTracker::Style::FONT_FAMILY] = attr.getValueStr();
     return diff;
   }
   StyleDiff visit_font_size(const svg::font_size &attr) {
     StyleDiff diff;
-    diff.styles[StyleTracker::Style::FONT_SIZE] = attr.getValue();
+    diff.styles[StyleTracker::Style::FONT_SIZE] = attr.getValueStr();
     return diff;
   }
   StyleDiff visit_fill(const svg::fill &attr) {
     StyleDiff diff;
-    diff.styles[StyleTracker::Style::FILL] = attr.getValue();
+    diff.styles[StyleTracker::Style::FILL] = attr.getValueStr();
     return diff;
   }
   StyleDiff visit_height(const svg::height &attr) {
     StyleDiff diff;
-    diff.styles[StyleTracker::Style::HEIGHT] = attr.getValue();
+    diff.styles[StyleTracker::Style::HEIGHT] = attr.getValueStr();
     return diff;
   }
   StyleDiff visit_stroke(const svg::stroke &attr) {
     StyleDiff diff;
-    diff.styles[StyleTracker::Style::STROKE] = attr.getValue();
+    diff.styles[StyleTracker::Style::STROKE] = attr.getValueStr();
     return diff;
   }
   StyleDiff visit_stroke_width(const svg::stroke_width &attr) {
     StyleDiff diff;
-    diff.styles[StyleTracker::Style::STROKE_WIDTH] = attr.getValue();
+    diff.styles[StyleTracker::Style::STROKE_WIDTH] = attr.getValueStr();
     return diff;
   }
   StyleDiff visit_stroke_dasharray(const svg::stroke_dasharray &attr) {
     StyleDiff diff;
-    diff.styles[StyleTracker::Style::STROKE_DASHARRAY] = attr.getValue();
+    diff.styles[StyleTracker::Style::STROKE_DASHARRAY] = attr.getValueStr();
     return diff;
   }
   StyleDiff visit_style(const svg::style &attr) {
@@ -344,12 +344,12 @@ struct StyleParser
   }
   StyleDiff visit_text_anchor(const svg::text_anchor &attr) {
     StyleDiff diff;
-    diff.styles[StyleTracker::Style::TEXT_ANCHOR] = attr.getValue();
+    diff.styles[StyleTracker::Style::TEXT_ANCHOR] = attr.getValueStr();
     return diff;
   }
   StyleDiff visit_width(const svg::width &attr) {
     StyleDiff diff;
-    diff.styles[StyleTracker::Style::WIDTH] = attr.getValue();
+    diff.styles[StyleTracker::Style::WIDTH] = attr.getValueStr();
     return diff;
   }
 };

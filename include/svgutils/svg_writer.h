@@ -22,11 +22,11 @@ namespace svg {
 using outstream_t = std::ostream;
 
 /// Base class of all SVG attributes.
-struct SVGAttribute {
+struct SVGAttribute final {
   SVGAttribute(const SVGAttribute &) = default;
   SVGAttribute &operator=(const SVGAttribute &) = default;
   const char *getName() const { return name; }
-  std::string getValue() const;
+  std::string getValueStr() const;
   const char *cstrOrNull() const;
   double toDouble() const;
   template <typename T> void setValue(T value) { this->value = value; }
@@ -41,6 +41,10 @@ struct SVGAttribute {
     std::visit([&os](auto &&value) { os << value; }, value);
   }
 
+  static SVGAttribute Create(const char *name, const char *value);
+  static SVGAttribute Create(const char *name, int64_t value);
+  static SVGAttribute Create(const char *name, double value);
+
 private:
   template <typename T> auto castToLegalType(T value) {
     if constexpr (std::is_pointer_v<T>)
@@ -51,13 +55,15 @@ private:
       return static_cast<double>(value);
   }
 
-protected:
   template <typename T>
   SVGAttribute(const char *name, T value)
       : name(name), value(castToLegalType(value)) {}
 
-private:
+  static const char *GetUniqueNameFor(const char *name);
+
   template <typename DerivedT> friend class SVGWriterBase;
+#define SVG_ATTR(NAME, STR, DEFAULT) friend struct NAME;
+#include "svg_entities.def"
 
   const char *name;
   using value_t = std::variant<const char *, int64_t, double>;
@@ -65,11 +71,19 @@ private:
 };
 
 #define SVG_ATTR(NAME, STR, DEFAULT)                                           \
-  struct NAME : public SVGAttribute {                                          \
-    template <typename T> NAME(T value) : SVGAttribute(tagName, value) {}      \
-    NAME();                                                                    \
+  struct NAME {                                                                \
+    template <typename T> NAME(T value) : attr(tagName, value) {}              \
+    NAME() : attr(tagName, DEFAULT) {}                                         \
+    explicit NAME(const SVGAttribute &attr) : NAME() { *this = attr; }         \
+    NAME &operator=(const SVGAttribute &attr);                                 \
+    operator SVGAttribute() const { return attr; }                             \
+    const char *getName() const { return tagName; }                            \
+    std::string getValueStr() const { return attr.getValueStr(); }             \
+    const char *cstrOrNull() const { return attr.cstrOrNull(); }               \
                                                                                \
   private:                                                                     \
+    friend class SVGAttribute;                                                 \
+    SVGAttribute attr;                                                         \
     template <typename DerivedTy, typename RetTy>                              \
     friend class SVGAttributeVisitor;                                          \
     static const char *tagName;                                                \
@@ -82,9 +96,9 @@ struct SVGAttributeVisitor {
 #define SVG_ATTR(NAME, STR, DEFAULT)                                           \
   if (attr.getName() == NAME::tagName)                                         \
     return static_cast<DerivedTy *>(this)->visit_##NAME(                       \
-        static_cast<const NAME &>(attr));
+        static_cast<const NAME>(attr));
 #include "svg_entities.def"
-    svg_unreachable("Encountered unknown (foreign) attribute");
+    return static_cast<DerivedTy *>(this)->visit_custom_attr(attr);
   }
 #define SVG_ATTR(NAME, STR, DEFAULT)                                           \
   RetTy visit_##NAME(const NAME &) {                                           \
@@ -94,6 +108,12 @@ struct SVGAttributeVisitor {
       return RetTy();                                                          \
   }
 #include "svg_entities.def"
+  RetTy visit_custom_attr(const SVGAttribute &) {
+    if constexpr (std::is_same_v<void, RetTy>)
+      return;
+    else
+      return RetTy();
+  }
 };
 
 /// Base implementation of a writer for svg documents.

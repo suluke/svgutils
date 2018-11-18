@@ -10,14 +10,20 @@ namespace svg {
 // member approach allows client code to define their own attributes
 // outside of svg_entities.def
 #define SVG_ATTR(NAME, STR, DEFAULT)                                           \
-  NAME::NAME() : SVGAttribute(tagName, DEFAULT) {}                             \
+  NAME &NAME::operator=(const SVGAttribute &attr) {                            \
+    if (attr.name != tagName)                                                  \
+      svg_unreachable("Tried casting svg attribute to " #NAME                  \
+                      " which isn't one");                                     \
+    this->attr.value = attr.value;                                             \
+    return *this;                                                              \
+  }                                                                            \
   const char *NAME::tagName = STR;
 #include "svgutils/svg_entities.def"
 } // namespace svg
 
 using namespace svg;
 
-std::string SVGAttribute::getValue() const {
+std::string SVGAttribute::getValueStr() const {
   std::string s;
   std::visit(
       [&s](auto &&value) {
@@ -55,4 +61,25 @@ double SVGAttribute::toDouble() const {
       },
       value);
   return res;
+}
+
+const char *SVGAttribute::GetUniqueNameFor(const char *name) {
+  // string_view performs a deep comparison whereas const char * is pointer
+  // comparison
+  std::string_view NameView = name;
+#define SVG_ATTR(NAME, STR, DEFAULT)                                           \
+  if (NameView == NAME::tagName)                                               \
+    return NAME::tagName;
+#include "svgutils/svg_entities.def"
+  return name;
+}
+
+SVGAttribute SVGAttribute::Create(const char *name, const char *value) {
+  return SVGAttribute(GetUniqueNameFor(name), value);
+}
+SVGAttribute SVGAttribute::Create(const char *name, int64_t value) {
+  return SVGAttribute(GetUniqueNameFor(name), value);
+}
+SVGAttribute SVGAttribute::Create(const char *name, double value) {
+  return SVGAttribute(GetUniqueNameFor(name), value);
 }
