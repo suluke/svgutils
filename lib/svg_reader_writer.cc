@@ -7,7 +7,7 @@
 using namespace svg;
 
 enum class SVGReaderWriterBase::TagType {
-  NONE = 0,
+  CUSTOM,
   COMMENT,
   CDATA,
   XMLDECL,
@@ -148,20 +148,29 @@ MaybeError SVGReaderWriterBase::parseTag(instream_t &is) {
   bool isClose = Tok == '/';
   if (isClose)
     is.get(Tok);
-  TagType tag = parseTagType(is);
+  std::string name = parseName(is);
+  if (name.empty())
+    return ParseError("Unexpected end of input. Expected tag name.");
+  TagType tag = parseTagType(name);
   if (isClose) {
     if (Tok != '>')
       return ParseError("Closing tag should end after name");
     return leave(tag);
   } else if (Tok == '>') {
-    dispatchTag(tag, {});
+    if (tag != TagType::CUSTOM)
+      dispatchTag(tag, {});
+    else
+      writer.custom_tag(name.c_str(), {});
     enter(tag);
   } else if (Tok == '/') {
     is.get(Tok);
     if (Tok != '>') {
       return ParseError("Encountered misplaced /");
     }
-    dispatchTag(tag, {});
+    if (tag != TagType::CUSTOM)
+      dispatchTag(tag, {});
+    else
+      writer.custom_tag(name.c_str(), {});
   } else if (std::isspace(Tok)) {
     std::vector<RawAttr> RawAttrs;
     std::vector<SVGAttribute> Attrs;
@@ -176,7 +185,10 @@ MaybeError SVGReaderWriterBase::parseTag(instream_t &is) {
         return ParseError("Encountered misplaced /");
     }
     assert(Tok == '>' && "We should be on the tag's closing >");
-    dispatchTag(tag, Attrs);
+    if (tag != TagType::CUSTOM)
+      dispatchTag(tag, Attrs);
+    else
+      writer.custom_tag(name.c_str(), Attrs);
     if (!isClosed)
       enter(tag);
   } else if (is.eof()) {
@@ -186,24 +198,24 @@ MaybeError SVGReaderWriterBase::parseTag(instream_t &is) {
   return ParseSuccess;
 }
 
-SVGReaderWriterBase::TagType SVGReaderWriterBase::parseTagType(instream_t &is) {
-  std::string name = parseName(is);
+SVGReaderWriterBase::TagType
+SVGReaderWriterBase::parseTagType(const std::string &name) {
 #define SVG_TAG(NAME, STR, ...)                                                \
-  if (name == STR)                                                             \
-    return TagType::NAME;
+  if (name == STR) {                                                           \
+    return TagType::NAME;                                                      \
+  }
 #include "svgutils/svg_entities.def"
-  return TagType::NONE;
+  return TagType::CUSTOM;
 }
 void SVGReaderWriterBase::dispatchTag(SVGReaderWriterBase::TagType tag,
                                       const std::vector<SVGAttribute> &attrs) {
-  assert(tag != TagType::NONE && "Cannot dispatch for unknown tag");
   switch (tag) {
 #define SVG_TAG(NAME, STR, ...)                                                \
   case TagType::NAME:                                                          \
     writer.NAME(attrs);                                                        \
     break;
 #include "svgutils/svg_entities.def"
-  case TagType::NONE:
+  case TagType::CUSTOM:
   case TagType::COMMENT:
   case TagType::CDATA:
   case TagType::XMLDECL:
@@ -261,14 +273,8 @@ MaybeError
 SVGReaderWriterBase::convertAttrs(const std::vector<RawAttr> &raws,
                                   /* out */ std::vector<SVGAttribute> &attrs) {
   assert(attrs.empty() && "Expected output vector to be empty");
-  for (const RawAttr &raw : raws) {
-#define SVG_ATTR(NAME, STR, DEFAULT)                                           \
-  if (raw.name == STR) {                                                       \
-    attrs.emplace_back(NAME(raw.value.c_str()));                               \
-    continue;                                                                  \
-  }
-#include "svgutils/svg_entities.def"
-    return ParseError("Unknown attribute");
-  }
+  for (const RawAttr &raw : raws)
+    attrs.emplace_back(
+        SVGAttribute::Create(raw.name.c_str(), raw.value.c_str()));
   return ParseSuccess;
 }

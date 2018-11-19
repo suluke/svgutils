@@ -36,12 +36,26 @@ public:
 
 #define SVG_TAG(NAME, STR, ...)                                                \
   template <typename... attrs_t> self_t &NAME(attrs_t... attrs) {              \
-    AttrContainer attrsVec = {std::forward<attrs_t>(attrs)...};                \
+    AttrContainer attrsVec({std::forward<attrs_t>(attrs)...});                 \
+    NAME(attrsVec);                                                            \
+    return *this;                                                              \
+  }                                                                            \
+  template <typename container_t> self_t &NAME(const container_t &attrs) {     \
+    AttrContainer attrsVec(attrs.begin(), attrs.end());                        \
     NAME(attrsVec);                                                            \
     return *this;                                                              \
   }                                                                            \
   self_t &NAME(const AttrContainer &attrs);
 #include "svgutils/svg_entities.def"
+  template <typename... attrs_t>
+  self_t &custom_tag(const char *name, attrs_t...) {
+    return custom_tag(name, std::vector<SVGAttribute>{});
+  }
+  template <typename container_t>
+  self_t &custom_tag(const char *name, const container_t &) {
+    return custom_tag(name, std::vector<SVGAttribute>{});
+  }
+  self_t &custom_tag(const char *name, const std::vector<SVGAttribute> &);
 
   self_t &content(const char *text);
   self_t &comment(const char *comment);

@@ -46,7 +46,7 @@ private:
   MaybeError parseXMLDecl(instream_t &is);
   MaybeError parseExclTag(instream_t &is);
   MaybeError parseTag(instream_t &is);
-  TagType parseTagType(instream_t &is);
+  static TagType parseTagType(const std::string &name);
   void dispatchTag(TagType tag, const std::vector<SVGAttribute> &attrs);
   std::string parseName(instream_t &is);
   MaybeError parseAttributes(instream_t &is,

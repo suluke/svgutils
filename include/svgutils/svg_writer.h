@@ -138,6 +138,23 @@ public:
   }
 #include "svg_entities.def"
 
+  template <typename... attrs_t>
+  DerivedTy &custom_tag(const char *name, attrs_t... attrs) {
+    openTag(name, std::forward<attrs_t>(attrs)...);
+    return *static_cast<DerivedTy *>(this);
+  }
+  template <typename container_t>
+  DerivedTy &custom_tag(const char *name, const container_t &attrs) {
+    std::vector<SVGAttribute> attrsVec(attrs.begin(), attrs.end());
+    static_cast<DerivedTy *>(this)->openTag(name, attrsVec);
+    return *static_cast<DerivedTy *>(this);
+  }
+  DerivedTy &custom_tag(const char *name,
+                        const std::vector<SVGAttribute> &attrs) {
+    static_cast<DerivedTy *>(this)->openTag(name, attrs);
+    return *static_cast<DerivedTy *>(this);
+  }
+
   DerivedTy &content(const char *text) {
     static_cast<DerivedTy *>(this)->closeTag();
     output() << text;
@@ -225,6 +242,8 @@ struct WriterConcept {
   }                                                                            \
   virtual void NAME(const std::vector<SVGAttribute> &attrs) = 0;
 #include "svg_entities.def"
+  virtual void custom_tag(const char *tag,
+                          const std::vector<SVGAttribute> &attrs) = 0;
   virtual void enter() = 0;
   virtual void leave() = 0;
   virtual void content(const char *) = 0;
@@ -242,6 +261,10 @@ template <typename WriterTy> struct WriterModel : public virtual WriterConcept {
     Writer.NAME(attrs);                                                        \
   }
 #include "svg_entities.def"
+  void custom_tag(const char *tag,
+                  const std::vector<SVGAttribute> &attrs) override {
+    Writer.custom_tag(tag, attrs);
+  }
   void enter() override { Writer.enter(); }
   void leave() override { Writer.leave(); }
   void content(const char *text) override { Writer.content(text); }
@@ -269,8 +292,29 @@ template <typename DerivedT> struct ExtendableWriter {
     std::vector<SVGAttribute> attrsVec(attrs.begin(), attrs.end());            \
     Writer->NAME(attrsVec);                                                    \
     return *static_cast<DerivedT *>(this);                                     \
+  }                                                                            \
+  DerivedT &NAME(const std::vector<SVGAttribute> &attrs) {                     \
+    Writer->NAME(attrs);                                                       \
+    return *static_cast<DerivedT *>(this);                                     \
   }
 #include "svg_entities.def"
+  template <typename... attrs_t>
+  DerivedT &custom_tag(const char *name, attrs_t... attrs) {
+    std::vector<SVGAttribute> attrsVec({std::forward<attrs_t>(attrs)...});
+    Writer->custom_tag(name, attrsVec);
+    return *static_cast<DerivedT *>(this);
+  }
+  template <typename container_t>
+  DerivedT &custom_tag(const char *name, const container_t &attrs) {
+    std::vector<SVGAttribute> attrsVec(attrs.begin(), attrs.end());
+    Writer->custom_tag(name, attrsVec);
+    return *static_cast<DerivedT *>(this);
+  }
+  DerivedT &custom_tag(const char *name,
+                       const std::vector<SVGAttribute> &attrs) {
+    Writer->custom_tag(name, attrs);
+    return *static_cast<DerivedT *>(this);
+  }
   DerivedT &enter() {
     Writer->enter();
     return *static_cast<DerivedT *>(this);

@@ -19,6 +19,7 @@ static void cairo_deleter(cairo_t *cr) {
 
 enum class CairoSVGWriter::TagType {
   NONE = 0,
+  CUSTOM,
 #define SVG_TAG(NAME, STR, ...) NAME,
 #include "svgutils/svg_entities.def"
 };
@@ -60,10 +61,20 @@ CairoSVGWriter::CairoSVGWriter(const fs::path &outfile, OutputFormat fmt,
   initCairo();
 }
 
+CairoSVGWriter &
+CairoSVGWriter::custom_tag(const char *name,
+                           const std::vector<SVGAttribute> &attrs) {
+  // We mostly ignore all custom tags
+  openTag(TagType::CUSTOM, attrs);
+  return *this;
+}
+
 CairoSVGWriter &CairoSVGWriter::content(const char *text) {
   closeTag();
   // Reference:
   // https://github.com/Distrotech/cairo/blob/17ef4acfcb64d1c525910a200e60d63087953c4c/src/cairo.c#L3197
+  if (parents.top() == TagType::CUSTOM)
+    return *this;
   assert(parents.size() && parents.top() == TagType::text &&
          "Content is only supported in text nodes at the moment");
   if (text == nullptr)
