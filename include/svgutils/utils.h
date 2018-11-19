@@ -22,9 +22,9 @@ namespace svg {
 
 inline std::string_view strview_trim(const std::string_view &str) {
   std::string_view res = str;
-  while (std::isspace(res.front()))
+  while (res.size() && std::isspace(res.front()))
     res.remove_prefix(1);
-  while (std::isspace(res.back()))
+  while (res.size() && std::isspace(res.back()))
     res.remove_suffix(1);
   return res;
 }
