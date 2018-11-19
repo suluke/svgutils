@@ -694,17 +694,144 @@ CairoSVGWriter::mpath(const CairoSVGWriter::AttrContainer &attrs) {
   return *this;
 }
 
-bool CairoSVGWriter::CairoExecuteHLine(std::string_view length, bool rel) {
+static std::string_view ExtractPathArg(/* inout */ std::string_view &args) {
+  auto End = std::find_if(args.begin(), args.end(),
+                          [](char C) { return C == ',' || std::isspace(C); });
+  std::string_view argStr = args.substr(0, End - args.begin());
+  if (End == args.end())
+    args.remove_prefix(args.size());
+  else
+    args.remove_prefix((End - args.begin()) + 1);
+  args = strview_trim(args);
+  argStr = strview_trim(argStr);
+  return argStr;
+}
+
+static bool ExtractPathArgs(/* inout */ std::string_view &argsStr) {
+  return true;
+}
+
+template <typename... args_t>
+static bool ExtractPathArgs(/* inout */ std::string_view &argsStr,
+                            /* out */ std::string_view &arg1,
+                            args_t &... argn) {
+  arg1 = ExtractPathArg(argsStr);
+  if (arg1.empty())
+    return false;
+  return ExtractPathArgs(argsStr, argn...);
+}
+
+CairoSVGWriter::PathErrorOr<CairoSVGWriter::ControlPoint>
+CairoSVGWriter::CairoExecuteCubicBezier(std::string_view args, bool rel) {
+  if (args.empty())
+    return PathError("No arguments given to C/c command");
+  std::string_view cp1X, cp1Y, cp2X, cp2Y, destX, destY;
+  ControlPoint CP;
+  while (args.size()) {
+    if (!ExtractPathArgs(args, cp1X, cp1Y, cp2X, cp2Y, destX, destY))
+      return PathError("Not enough arguments given to C/c command");
+    auto x1 = strview_to_double(cp1X);
+    auto y1 = strview_to_double(cp1Y);
+    auto x2 = strview_to_double(cp2X);
+    auto y2 = strview_to_double(cp2Y);
+    auto x3 = strview_to_double(destX);
+    auto y3 = strview_to_double(destY);
+    if (!(x1 && y1 && x2 && y2 && x3 && y3))
+      return PathError("Invalid arguments given to C/c command");
+    if (rel) {
+      double x0, y0;
+      cairo_get_current_point(cairo.get(), &x0, &y0);
+      CP = {x0 + *x2, y0 + *y2};
+      cairo_rel_curve_to(cairo.get(), *x1, *y1, *x2, *y2, *x3, *y3);
+    } else {
+      CP = {*x2, *y2};
+      cairo_curve_to(cairo.get(), *x1, *y1, *x2, *y2, *x3, *y3);
+    }
+  }
+  return CP;
+}
+CairoSVGWriter::PathErrorOr<CairoSVGWriter::ControlPoint>
+CairoSVGWriter::CairoExecuteSmoothCubicBezier(
+    std::string_view args, bool rel,
+    const std::optional<ControlPoint> &PrevCP) {
+  if (args.empty())
+    return PathError("No arguments given to S/s command");
+  std::string_view x2, y2, x3, y3;
+  ControlPoint CP;
+  while (args.size()) {
+    if (!ExtractPathArgs(args, x2, y2, x3, y3))
+      return PathError("Not enough arguments given to S/s command");
+    // TODO
+  }
+  return CP;
+}
+CairoSVGWriter::PathErrorOr<CairoSVGWriter::ControlPoint>
+CairoSVGWriter::CairoExecuteQuadraticBezier(std::string_view args, bool rel) {
+  if (args.empty())
+    return PathError("No arguments given to Q/q command");
+  std::string_view cpX, cpY, destX, destY;
+  ControlPoint CP;
+  while (args.size()) {
+    if (!ExtractPathArgs(args, cpX, cpY, destX, destY))
+      return PathError("Not enough arguments given to Q/q command");
+    double x0, y0;
+    cairo_get_current_point(cairo.get(), &x0, &y0);
+    auto x3 = strview_to_double(destX);
+    auto y3 = strview_to_double(destY);
+    // the quadratic curve's control point
+    auto qx = strview_to_double(cpX);
+    auto qy = strview_to_double(cpY);
+    if (!(x3 && y3 && qx && qy))
+      return PathError("Invalid arguments given to Q/q command");
+    // https://stackoverflow.com/a/3162732/1468532
+    double x1 = x0 + 2. / 3. * (*qx - x0);
+    double y1 = y0 + 2. / 3. * (*qy - y0);
+    double x2 = *x3 + 2. / 3. * (*qx - *x3);
+    double y2 = *y3 + 2. / 3. * (*qy - *y3);
+    if (rel) {
+      CP = {x0 + x2, y0 + y2};
+      cairo_rel_curve_to(cairo.get(), x1, y1, x2, y2, *x3, *y3);
+    } else {
+      CP = {x2, y2};
+      cairo_curve_to(cairo.get(), x1, y1, x2, y2, *x3, *y3);
+    }
+  }
+  return CP;
+}
+CairoSVGWriter::PathErrorOr<CairoSVGWriter::ControlPoint>
+CairoSVGWriter::CairoExecuteSmoothQuadraticBezier(
+    std::string_view args, bool rel,
+    const std::optional<ControlPoint> &PrevCP) {
+  if (args.empty())
+    return PathError("No arguments given to T/t command");
+  std::string_view x3, y3;
+  ControlPoint CP;
+  while (args.size()) {
+    if (!ExtractPathArgs(args, x3, y3))
+      return PathError("Not enough arguments given to T/t command");
+    // TODO
+  }
+  return CP;
+}
+CairoSVGWriter::PathErrorOrVoid
+CairoSVGWriter::CairoExecuteArc(std::string_view args, bool rel) {
+  std::string_view rx, ry, largeArcFlag, sweepFlag, x, y;
+  while (args.size()) {
+    if (!ExtractPathArgs(args, rx, ry, largeArcFlag, sweepFlag, x, y))
+      return PathError{"Not enough arguments given to A/a command"};
+    // TODO
+  }
+  return {};
+}
+
+CairoSVGWriter::PathErrorOrVoid
+CairoSVGWriter::CairoExecuteHLine(std::string_view length, bool rel) {
   double X, Y;
   cairo_get_current_point(cairo.get(), &X, &Y);
   while (length.size()) {
-    auto End = std::find_if(length.begin(), length.end(),
-                            [](char C) { return C == ',' || std::isspace(C); });
-    std::string_view lenStr = length.substr(0, End - length.begin());
-    if (End == length.end())
-      length.remove_prefix(length.size());
-    else
-      length.remove_prefix((End - length.begin()) + 1);
+    std::string_view lenStr;
+    if (!ExtractPathArgs(length, lenStr))
+      return PathError{"No argument given to H/h command"};
     CSSUnit lenCss = CSSUnit::parse(lenStr);
     double len = convertCSSWidth(lenCss);
     if (rel)
@@ -712,19 +839,16 @@ bool CairoSVGWriter::CairoExecuteHLine(std::string_view length, bool rel) {
     else
       cairo_line_to(cairo.get(), len, Y);
   }
-  return true;
+  return {};
 }
-bool CairoSVGWriter::CairoExecuteVLine(std::string_view length, bool rel) {
+CairoSVGWriter::PathErrorOrVoid
+CairoSVGWriter::CairoExecuteVLine(std::string_view length, bool rel) {
   double X, Y;
   cairo_get_current_point(cairo.get(), &X, &Y);
   while (length.size()) {
-    auto End = std::find_if(length.begin(), length.end(),
-                            [](char C) { return C == ',' || std::isspace(C); });
-    std::string_view lenStr = length.substr(0, End - length.begin());
-    if (End == length.end())
-      length.remove_prefix(length.size());
-    else
-      length.remove_prefix((End - length.begin()) + 1);
+    std::string_view lenStr;
+    if (!ExtractPathArgs(length, lenStr))
+      return PathError{"No argument given to V/v command"};
     CSSUnit lenCss = CSSUnit::parse(lenStr);
     double len = convertCSSHeight(lenCss);
     if (rel)
@@ -732,26 +856,15 @@ bool CairoSVGWriter::CairoExecuteVLine(std::string_view length, bool rel) {
     else
       cairo_line_to(cairo.get(), X, len);
   }
-  return true;
+  return {};
 }
 
-bool CairoSVGWriter::CairoExecuteLineTo(std::string_view points, bool rel) {
+CairoSVGWriter::PathErrorOrVoid
+CairoSVGWriter::CairoExecuteLineTo(std::string_view points, bool rel) {
   while (points.size()) {
-    auto xEnd = std::find_if(points.begin(), points.end(), [](char C) {
-      return C == ',' || std::isspace(C);
-    });
-    if (xEnd == points.end())
-      return false; // Error: No y value given
-    std::string_view xStr = points.substr(0, xEnd - points.begin());
-    points.remove_prefix((xEnd - points.begin()) + 1);
-    auto yEnd = std::find_if(points.begin(), points.end(),
-                             [](char C) { return C == std::isspace(C); });
-    std::string_view yStr = points.substr(0, yEnd - points.begin());
-    if (yEnd == points.end())
-      points.remove_prefix(points.size());
-    else
-      points.remove_prefix((yEnd - points.begin()) + 1);
-    points = strview_trim(points);
+    std::string_view xStr, yStr;
+    if (!ExtractPathArgs(points, xStr, yStr))
+      return PathError{"Not enough arguments given to L/l command"};
     CSSUnit xCss = CSSUnit::parse(xStr);
     CSSUnit yCss = CSSUnit::parse(yStr);
     double x = convertCSSWidth(xCss);
@@ -761,25 +874,15 @@ bool CairoSVGWriter::CairoExecuteLineTo(std::string_view points, bool rel) {
     else
       cairo_line_to(cairo.get(), x, y);
   }
-  return true;
+  return {};
 }
-bool CairoSVGWriter::CairoExecuteMoveTo(std::string_view points, bool rel) {
+CairoSVGWriter::PathErrorOrVoid
+CairoSVGWriter::CairoExecuteMoveTo(std::string_view points, bool rel) {
   if (points.empty())
-    return true;
-  auto xEnd = std::find_if(points.begin(), points.end(),
-                           [](char C) { return C == ',' || std::isspace(C); });
-  if (xEnd == points.end())
-    return false; // Error: No y value given
-  std::string_view xStr = points.substr(0, xEnd - points.begin());
-  points.remove_prefix((xEnd - points.begin()) + 1);
-  auto yEnd = std::find_if(points.begin(), points.end(),
-                           [](char C) { return C == std::isspace(C); });
-  std::string_view yStr = points.substr(0, yEnd - points.begin());
-  if (yEnd == points.end())
-    points.remove_prefix(points.size());
-  else
-    points.remove_prefix((yEnd - points.begin()) + 1);
-  points = strview_trim(points);
+    return PathError{"No arguments given to M/m command"};
+  std::string_view xStr, yStr;
+  if (!ExtractPathArgs(points, xStr, yStr))
+    return PathError("Not enough arguments given to M/m command");
   CSSUnit xCss = CSSUnit::parse(xStr);
   CSSUnit yCss = CSSUnit::parse(yStr);
   double x = convertCSSWidth(xCss);
@@ -789,10 +892,11 @@ bool CairoSVGWriter::CairoExecuteMoveTo(std::string_view points, bool rel) {
   else
     cairo_move_to(cairo.get(), x, y);
   CairoExecuteLineTo(points, rel);
-  return true;
+  return {};
 }
 
-bool CairoSVGWriter::CairoExecutePath(const char *pathRaw) {
+CairoSVGWriter::PathErrorOrVoid
+CairoSVGWriter::CairoExecutePath(const char *pathRaw) {
   std::string_view path = strview_trim(pathRaw);
   const char commands[] = "MmLlHhVvCcSsQqTtAaZz";
   // Invariant: There is always non-whitespace content in path and path is
@@ -800,7 +904,7 @@ bool CairoSVGWriter::CairoExecutePath(const char *pathRaw) {
   while (path.size()) {
     auto cmdpos = path.find_first_of(commands);
     if (cmdpos == path.npos)
-      return false; // Error: There was content but no valid command
+      return PathError{"Did not find any valid commands"};
     char cmd = path[cmdpos];
     path.remove_prefix(cmdpos + 1);
     auto argsEnd = path.find_first_of(commands);
@@ -810,58 +914,73 @@ bool CairoSVGWriter::CairoExecutePath(const char *pathRaw) {
       path.remove_prefix(path.size());
     else
       path.remove_prefix(argsEnd);
-    switch (cmd) {
-    case 'M':
-      CairoExecuteMoveTo(args, false);
-      break;
+    const bool rel = std::tolower(cmd) == cmd;
+    PathErrorOrVoid err;
+    std::optional<ControlPoint> PrevCP;
+    switch (std::tolower(cmd)) {
     case 'm':
-      CairoExecuteMoveTo(args, true);
-      break;
-    case 'L':
-      CairoExecuteLineTo(args, false);
+      err = CairoExecuteMoveTo(args, rel);
+      PrevCP = std::nullopt;
       break;
     case 'l':
-      CairoExecuteLineTo(args, true);
-      break;
-    case 'H':
-      CairoExecuteHLine(args, false);
+      err = CairoExecuteLineTo(args, rel);
+      PrevCP = std::nullopt;
       break;
     case 'h':
-      CairoExecuteHLine(args, true);
-      break;
-    case 'V':
-      CairoExecuteVLine(args, false);
+      err = CairoExecuteHLine(args, rel);
+      PrevCP = std::nullopt;
       break;
     case 'v':
-      CairoExecuteVLine(args, true);
+      err = CairoExecuteVLine(args, rel);
+      PrevCP = std::nullopt;
       break;
-    case 'C':
-      break;
-    case 'c':
-      break;
-    case 'S':
-      break;
-    case 's':
-      break;
-    case 'Q':
-      break;
-    case 'q':
-      break;
-    case 'T':
-      break;
-    case 't':
-      break;
-    case 'A':
-      break;
-    case 'a':
-      break;
-    case 'Z':
-      break;
-    case 'z':
+    case 'c': {
+      auto errOrCP = CairoExecuteCubicBezier(args, rel);
+      if (errOrCP)
+        err = errOrCP.to_error();
+      else
+        PrevCP = *errOrCP;
       break;
     }
+    case 's': {
+      auto errOrCP = CairoExecuteSmoothCubicBezier(args, rel, PrevCP);
+      if (errOrCP)
+        err = errOrCP.to_error();
+      else
+        PrevCP = *errOrCP;
+      break;
+    }
+    case 'q': {
+      auto errOrCP = CairoExecuteQuadraticBezier(args, rel);
+      if (errOrCP)
+        err = errOrCP.to_error();
+      else
+        PrevCP = *errOrCP;
+      break;
+    }
+    case 't': {
+      auto errOrCP = CairoExecuteSmoothQuadraticBezier(args, rel, PrevCP);
+      if (errOrCP)
+        err = errOrCP.to_error();
+      else
+        PrevCP = *errOrCP;
+      break;
+    }
+    case 'a':
+      err = CairoExecuteArc(args, rel);
+      PrevCP = std::nullopt;
+      break;
+    case 'z':
+      cairo_close_path(cairo.get());
+      PrevCP = std::nullopt;
+      break;
+    default:
+      svg_unreachable("Encountered unknown command");
+    }
+    if (err)
+      return err;
   }
-  return true;
+  return {};
 }
 
 CairoSVGWriter &
@@ -879,7 +998,8 @@ CairoSVGWriter::path(const CairoSVGWriter::AttrContainer &attrs) {
     attrParser.visit(Attr);
   if (!pathDesc)
     return *this;
-  CairoExecutePath(pathDesc->cstrOrNull());
+  if (auto err = CairoExecutePath(pathDesc->cstrOrNull()))
+    svg_unreachable(err.to_error().what().c_str());
   applyCSSFillAndStroke(false);
   return *this;
 }

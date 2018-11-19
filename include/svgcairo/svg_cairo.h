@@ -99,11 +99,65 @@ private:
   void applyCSSFillAndStroke(bool preserve);
   void initCairo();
 
-  bool CairoExecuteHLine(std::string_view length, bool rel);
-  bool CairoExecuteVLine(std::string_view length, bool rel);
-  bool CairoExecuteLineTo(std::string_view points, bool rel);
-  bool CairoExecuteMoveTo(std::string_view points, bool rel);
-  bool CairoExecutePath(const char *pathRaw);
+  struct PathError {
+    explicit PathError(const std::string &what) : msg(what) {}
+    PathError(const PathError &) = default;
+    PathError &operator=(const PathError &) = default;
+    PathError(PathError &&) = default;
+    PathError &operator=(PathError &&) = default;
+    const std::string &what() const { return msg; }
+  private:
+    std::string msg;
+  };
+  template<typename T>
+  struct PathErrorOr {
+    // Initialize-from-value ctors
+    PathErrorOr(const T &val) : content(val) {}
+    PathErrorOr(T &&val) : content(std::move(val)) {}
+    PathErrorOr(const PathError &err) : content(err) {}
+    PathErrorOr(PathError &&err) : content(std::move(err)) {}
+    // Default/Copy/Assignment ctors
+    PathErrorOr() = delete;
+    PathErrorOr(const PathErrorOr &) = default;
+    PathErrorOr &operator=(const PathErrorOr &) = default;
+    PathErrorOr(PathErrorOr &&) = default;
+    PathErrorOr &operator=(PathErrorOr &&) = default;
+    // Inspection
+    operator bool() const { return std::holds_alternative<PathError>(content); }
+    const T& operator*() const { return std::get<T>(content); }
+    operator const T&() const { return std::get<T>(content); }
+    const PathError &to_error() const { return std::get<PathError>(content); }
+  private:
+    std::variant<PathError, T> content;
+  };
+  struct PathErrorOrVoid {
+    PathErrorOrVoid() = default;
+    PathErrorOrVoid(const PathError &err) : err(err) {}
+    PathErrorOrVoid(PathError &&err) : err(std::move(err)) {}
+    // Default/Copy/Assignment ctors
+    PathErrorOrVoid(const PathErrorOrVoid &) = default;
+    PathErrorOrVoid &operator=(const PathErrorOrVoid &) = default;
+    PathErrorOrVoid(PathErrorOrVoid &&) = default;
+    PathErrorOrVoid &operator=(PathErrorOrVoid &&) = default;
+    // Inspection
+    operator bool() const { return !!err; }
+    const PathError &to_error() const { return *err; }
+  private:
+    std::optional<PathError> err;
+  };
+
+  using ControlPoint = std::pair<double, double>;
+
+  PathErrorOr<ControlPoint> CairoExecuteCubicBezier(std::string_view args, bool rel);
+  PathErrorOr<ControlPoint> CairoExecuteSmoothCubicBezier(std::string_view args, bool rel, const std::optional<ControlPoint> &PrevCP);
+  PathErrorOr<ControlPoint> CairoExecuteQuadraticBezier(std::string_view args, bool rel);
+  PathErrorOr<ControlPoint> CairoExecuteSmoothQuadraticBezier(std::string_view args, bool rel, const std::optional<ControlPoint> &PrevCP);
+  PathErrorOrVoid CairoExecuteArc(std::string_view args, bool rel);
+  PathErrorOrVoid CairoExecuteHLine(std::string_view length, bool rel);
+  PathErrorOrVoid CairoExecuteVLine(std::string_view length, bool rel);
+  PathErrorOrVoid CairoExecuteLineTo(std::string_view points, bool rel);
+  PathErrorOrVoid CairoExecuteMoveTo(std::string_view points, bool rel);
+  PathErrorOrVoid CairoExecutePath(const char *pathRaw);
 };
 } // namespace svg
 #endif // SVGCAIRO_SVG_CAIRO_H
