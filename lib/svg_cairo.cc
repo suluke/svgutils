@@ -327,48 +327,29 @@ void CairoSVGWriter::applyCSSFillAndStroke(bool preserve) {
   applyCSSFill(preserve);
 }
 
-CairoSVGWriter &CairoSVGWriter::a(const CairoSVGWriter::AttrContainer &attrs) {
-  openTag(TagType::a, attrs);
-  return *this;
+#define SVG_TAG(NAME, STR, ...)                                                \
+  CairoSVGWriter &CairoSVGWriter::NAME(const AttrContainer &attrs) {           \
+    openTag(TagType::NAME, attrs);                                             \
+    NAME##_impl(attrs);                                                        \
+    return *this;                                                              \
+  }
+#include "svgutils/svg_entities.def"
+
+void CairoSVGWriter::a_impl(const CairoSVGWriter::AttrContainer &attrs) {}
+void CairoSVGWriter::altGlyph_impl(const CairoSVGWriter::AttrContainer &attrs) {
 }
-CairoSVGWriter &
-CairoSVGWriter::altGlyph(const CairoSVGWriter::AttrContainer &attrs) {
-  openTag(TagType::altGlyph, attrs);
-  return *this;
-}
-CairoSVGWriter &
-CairoSVGWriter::altGlyphDef(const CairoSVGWriter::AttrContainer &attrs) {
-  openTag(TagType::altGlyphDef, attrs);
-  return *this;
-}
-CairoSVGWriter &
-CairoSVGWriter::altGlyphItem(const CairoSVGWriter::AttrContainer &attrs) {
-  openTag(TagType::altGlyphItem, attrs);
-  return *this;
-}
-CairoSVGWriter &
-CairoSVGWriter::animate(const CairoSVGWriter::AttrContainer &attrs) {
-  openTag(TagType::animate, attrs);
-  return *this;
-}
-CairoSVGWriter &
-CairoSVGWriter::animateColor(const CairoSVGWriter::AttrContainer &attrs) {
-  openTag(TagType::animateColor, attrs);
-  return *this;
-}
-CairoSVGWriter &
-CairoSVGWriter::animateMotion(const CairoSVGWriter::AttrContainer &attrs) {
-  openTag(TagType::animateMotion, attrs);
-  return *this;
-}
-CairoSVGWriter &
-CairoSVGWriter::animateTransform(const CairoSVGWriter::AttrContainer &attrs) {
-  openTag(TagType::animateTransform, attrs);
-  return *this;
-}
-CairoSVGWriter &
-CairoSVGWriter::circle(const CairoSVGWriter::AttrContainer &attrs) {
-  openTag(TagType::circle, attrs);
+void CairoSVGWriter::altGlyphDef_impl(
+    const CairoSVGWriter::AttrContainer &attrs) {}
+void CairoSVGWriter::altGlyphItem_impl(
+    const CairoSVGWriter::AttrContainer &attrs) {}
+void CairoSVGWriter::animate_impl(const CairoSVGWriter::AttrContainer &attrs) {}
+void CairoSVGWriter::animateColor_impl(
+    const CairoSVGWriter::AttrContainer &attrs) {}
+void CairoSVGWriter::animateMotion_impl(
+    const CairoSVGWriter::AttrContainer &attrs) {}
+void CairoSVGWriter::animateTransform_impl(
+    const CairoSVGWriter::AttrContainer &attrs) {}
+void CairoSVGWriter::circle_impl(const CairoSVGWriter::AttrContainer &attrs) {
   CSSUnit cx, cy, r;
   struct AttrParser : public SVGAttributeVisitor<AttrParser> {
     AttrParser(CSSUnit &cx, CSSUnit &cy, CSSUnit &r) : cx(cx), cy(cy), r(r) {}
@@ -384,245 +365,81 @@ CairoSVGWriter::circle(const CairoSVGWriter::AttrContainer &attrs) {
   cairo_arc(cairo.get(), convertCSSWidth(cx), convertCSSHeight(cy),
             convertCSSWidth(r), 0., 2 * M_PI);
   applyCSSFillAndStroke(false);
-  return *this;
 }
-CairoSVGWriter &
-CairoSVGWriter::clipPath(const CairoSVGWriter::AttrContainer &attrs) {
-  openTag(TagType::clipPath, attrs);
-  return *this;
+void CairoSVGWriter::clipPath_impl(const CairoSVGWriter::AttrContainer &attrs) {
 }
-CairoSVGWriter &
-CairoSVGWriter::color_profile(const CairoSVGWriter::AttrContainer &attrs) {
-  openTag(TagType::color_profile, attrs);
-  return *this;
+void CairoSVGWriter::color_profile_impl(
+    const CairoSVGWriter::AttrContainer &attrs) {}
+void CairoSVGWriter::cursor_impl(const CairoSVGWriter::AttrContainer &attrs) {}
+void CairoSVGWriter::defs_impl(const CairoSVGWriter::AttrContainer &attrs) {}
+void CairoSVGWriter::desc_impl(const CairoSVGWriter::AttrContainer &attrs) {}
+void CairoSVGWriter::discard_impl(const CairoSVGWriter::AttrContainer &attrs) {}
+void CairoSVGWriter::ellipse_impl(const CairoSVGWriter::AttrContainer &attrs) {}
+void CairoSVGWriter::feBlend_impl(const CairoSVGWriter::AttrContainer &attrs) {}
+void CairoSVGWriter::feColorMatrix_impl(
+    const CairoSVGWriter::AttrContainer &attrs) {}
+void CairoSVGWriter::feComponentTransfer_impl(
+    const CairoSVGWriter::AttrContainer &attrs) {}
+void CairoSVGWriter::feComposite_impl(
+    const CairoSVGWriter::AttrContainer &attrs) {}
+void CairoSVGWriter::feConvolveMatrix_impl(
+    const CairoSVGWriter::AttrContainer &attrs) {}
+void CairoSVGWriter::feDiffuseLighting_impl(
+    const CairoSVGWriter::AttrContainer &attrs) {}
+void CairoSVGWriter::feDisplacementMap_impl(
+    const CairoSVGWriter::AttrContainer &attrs) {}
+void CairoSVGWriter::feDistantLight_impl(
+    const CairoSVGWriter::AttrContainer &attrs) {}
+void CairoSVGWriter::feDropShadow_impl(
+    const CairoSVGWriter::AttrContainer &attrs) {}
+void CairoSVGWriter::feFlood_impl(const CairoSVGWriter::AttrContainer &attrs) {}
+void CairoSVGWriter::feFuncA_impl(const CairoSVGWriter::AttrContainer &attrs) {}
+void CairoSVGWriter::feFuncB_impl(const CairoSVGWriter::AttrContainer &attrs) {}
+void CairoSVGWriter::feFuncG_impl(const CairoSVGWriter::AttrContainer &attrs) {}
+void CairoSVGWriter::feFuncR_impl(const CairoSVGWriter::AttrContainer &attrs) {}
+void CairoSVGWriter::feGaussianBlur_impl(
+    const CairoSVGWriter::AttrContainer &attrs) {}
+void CairoSVGWriter::feImage_impl(const CairoSVGWriter::AttrContainer &attrs) {}
+void CairoSVGWriter::feMerge_impl(const CairoSVGWriter::AttrContainer &attrs) {}
+void CairoSVGWriter::feMergeNode_impl(
+    const CairoSVGWriter::AttrContainer &attrs) {}
+void CairoSVGWriter::feMorphology_impl(
+    const CairoSVGWriter::AttrContainer &attrs) {}
+void CairoSVGWriter::feOffset_impl(const CairoSVGWriter::AttrContainer &attrs) {
 }
-CairoSVGWriter &
-CairoSVGWriter::cursor(const CairoSVGWriter::AttrContainer &attrs) {
-  openTag(TagType::cursor, attrs);
-  return *this;
+void CairoSVGWriter::fePointLight_impl(
+    const CairoSVGWriter::AttrContainer &attrs) {}
+void CairoSVGWriter::feSpecularLighting_impl(
+    const CairoSVGWriter::AttrContainer &attrs) {}
+void CairoSVGWriter::feSpotLight_impl(
+    const CairoSVGWriter::AttrContainer &attrs) {}
+void CairoSVGWriter::feTile_impl(const CairoSVGWriter::AttrContainer &attrs) {}
+void CairoSVGWriter::feTurbulence_impl(
+    const CairoSVGWriter::AttrContainer &attrs) {}
+void CairoSVGWriter::filter_impl(const CairoSVGWriter::AttrContainer &attrs) {}
+void CairoSVGWriter::font_impl(const CairoSVGWriter::AttrContainer &attrs) {}
+void CairoSVGWriter::font_face_impl(
+    const CairoSVGWriter::AttrContainer &attrs) {}
+void CairoSVGWriter::font_face_format_impl(
+    const CairoSVGWriter::AttrContainer &attrs) {}
+void CairoSVGWriter::font_face_name_impl(
+    const CairoSVGWriter::AttrContainer &attrs) {}
+void CairoSVGWriter::font_face_src_impl(
+    const CairoSVGWriter::AttrContainer &attrs) {}
+void CairoSVGWriter::font_face_uri_impl(
+    const CairoSVGWriter::AttrContainer &attrs) {}
+void CairoSVGWriter::foreignObject_impl(
+    const CairoSVGWriter::AttrContainer &attrs) {}
+void CairoSVGWriter::g_impl(const CairoSVGWriter::AttrContainer &attrs) {}
+void CairoSVGWriter::glyph_impl(const CairoSVGWriter::AttrContainer &attrs) {}
+void CairoSVGWriter::glyphRef_impl(const CairoSVGWriter::AttrContainer &attrs) {
 }
-CairoSVGWriter &
-CairoSVGWriter::defs(const CairoSVGWriter::AttrContainer &attrs) {
-  openTag(TagType::defs, attrs);
-  return *this;
-}
-CairoSVGWriter &
-CairoSVGWriter::desc(const CairoSVGWriter::AttrContainer &attrs) {
-  openTag(TagType::desc, attrs);
-  return *this;
-}
-CairoSVGWriter &
-CairoSVGWriter::discard(const CairoSVGWriter::AttrContainer &attrs) {
-  openTag(TagType::discard, attrs);
-  return *this;
-}
-CairoSVGWriter &
-CairoSVGWriter::ellipse(const CairoSVGWriter::AttrContainer &attrs) {
-  openTag(TagType::ellipse, attrs);
-  return *this;
-}
-CairoSVGWriter &
-CairoSVGWriter::feBlend(const CairoSVGWriter::AttrContainer &attrs) {
-  openTag(TagType::feBlend, attrs);
-  return *this;
-}
-CairoSVGWriter &
-CairoSVGWriter::feColorMatrix(const CairoSVGWriter::AttrContainer &attrs) {
-  openTag(TagType::feColorMatrix, attrs);
-  return *this;
-}
-CairoSVGWriter &CairoSVGWriter::feComponentTransfer(
-    const CairoSVGWriter::AttrContainer &attrs) {
-  openTag(TagType::feComponentTransfer, attrs);
-  return *this;
-}
-CairoSVGWriter &
-CairoSVGWriter::feComposite(const CairoSVGWriter::AttrContainer &attrs) {
-  openTag(TagType::feComposite, attrs);
-  return *this;
-}
-CairoSVGWriter &
-CairoSVGWriter::feConvolveMatrix(const CairoSVGWriter::AttrContainer &attrs) {
-  openTag(TagType::feConvolveMatrix, attrs);
-  return *this;
-}
-CairoSVGWriter &
-CairoSVGWriter::feDiffuseLighting(const CairoSVGWriter::AttrContainer &attrs) {
-  openTag(TagType::feDiffuseLighting, attrs);
-  return *this;
-}
-CairoSVGWriter &
-CairoSVGWriter::feDisplacementMap(const CairoSVGWriter::AttrContainer &attrs) {
-  openTag(TagType::feDisplacementMap, attrs);
-  return *this;
-}
-CairoSVGWriter &
-CairoSVGWriter::feDistantLight(const CairoSVGWriter::AttrContainer &attrs) {
-  openTag(TagType::feDistantLight, attrs);
-  return *this;
-}
-CairoSVGWriter &
-CairoSVGWriter::feDropShadow(const CairoSVGWriter::AttrContainer &attrs) {
-  openTag(TagType::feDropShadow, attrs);
-  return *this;
-}
-CairoSVGWriter &
-CairoSVGWriter::feFlood(const CairoSVGWriter::AttrContainer &attrs) {
-  openTag(TagType::feFlood, attrs);
-  return *this;
-}
-CairoSVGWriter &
-CairoSVGWriter::feFuncA(const CairoSVGWriter::AttrContainer &attrs) {
-  openTag(TagType::feFuncA, attrs);
-  return *this;
-}
-CairoSVGWriter &
-CairoSVGWriter::feFuncB(const CairoSVGWriter::AttrContainer &attrs) {
-  openTag(TagType::feFuncB, attrs);
-  return *this;
-}
-CairoSVGWriter &
-CairoSVGWriter::feFuncG(const CairoSVGWriter::AttrContainer &attrs) {
-  openTag(TagType::feFuncG, attrs);
-  return *this;
-}
-CairoSVGWriter &
-CairoSVGWriter::feFuncR(const CairoSVGWriter::AttrContainer &attrs) {
-  openTag(TagType::feFuncR, attrs);
-  return *this;
-}
-CairoSVGWriter &
-CairoSVGWriter::feGaussianBlur(const CairoSVGWriter::AttrContainer &attrs) {
-  openTag(TagType::feGaussianBlur, attrs);
-  return *this;
-}
-CairoSVGWriter &
-CairoSVGWriter::feImage(const CairoSVGWriter::AttrContainer &attrs) {
-  openTag(TagType::feImage, attrs);
-  return *this;
-}
-CairoSVGWriter &
-CairoSVGWriter::feMerge(const CairoSVGWriter::AttrContainer &attrs) {
-  openTag(TagType::feMerge, attrs);
-  return *this;
-}
-CairoSVGWriter &
-CairoSVGWriter::feMergeNode(const CairoSVGWriter::AttrContainer &attrs) {
-  openTag(TagType::feMergeNode, attrs);
-  return *this;
-}
-CairoSVGWriter &
-CairoSVGWriter::feMorphology(const CairoSVGWriter::AttrContainer &attrs) {
-  openTag(TagType::feMorphology, attrs);
-  return *this;
-}
-CairoSVGWriter &
-CairoSVGWriter::feOffset(const CairoSVGWriter::AttrContainer &attrs) {
-  openTag(TagType::feOffset, attrs);
-  return *this;
-}
-CairoSVGWriter &
-CairoSVGWriter::fePointLight(const CairoSVGWriter::AttrContainer &attrs) {
-  openTag(TagType::fePointLight, attrs);
-  return *this;
-}
-CairoSVGWriter &
-CairoSVGWriter::feSpecularLighting(const CairoSVGWriter::AttrContainer &attrs) {
-  openTag(TagType::feSpecularLighting, attrs);
-  return *this;
-}
-CairoSVGWriter &
-CairoSVGWriter::feSpotLight(const CairoSVGWriter::AttrContainer &attrs) {
-  openTag(TagType::feSpotLight, attrs);
-  return *this;
-}
-CairoSVGWriter &
-CairoSVGWriter::feTile(const CairoSVGWriter::AttrContainer &attrs) {
-  openTag(TagType::feTile, attrs);
-  return *this;
-}
-CairoSVGWriter &
-CairoSVGWriter::feTurbulence(const CairoSVGWriter::AttrContainer &attrs) {
-  openTag(TagType::feTurbulence, attrs);
-  return *this;
-}
-CairoSVGWriter &
-CairoSVGWriter::filter(const CairoSVGWriter::AttrContainer &attrs) {
-  openTag(TagType::filter, attrs);
-  return *this;
-}
-CairoSVGWriter &
-CairoSVGWriter::font(const CairoSVGWriter::AttrContainer &attrs) {
-  openTag(TagType::font, attrs);
-  return *this;
-}
-CairoSVGWriter &
-CairoSVGWriter::font_face(const CairoSVGWriter::AttrContainer &attrs) {
-  openTag(TagType::font_face, attrs);
-  return *this;
-}
-CairoSVGWriter &
-CairoSVGWriter::font_face_format(const CairoSVGWriter::AttrContainer &attrs) {
-  openTag(TagType::font_face_format, attrs);
-  return *this;
-}
-CairoSVGWriter &
-CairoSVGWriter::font_face_name(const CairoSVGWriter::AttrContainer &attrs) {
-  openTag(TagType::font_face_name, attrs);
-  return *this;
-}
-CairoSVGWriter &
-CairoSVGWriter::font_face_src(const CairoSVGWriter::AttrContainer &attrs) {
-  openTag(TagType::font_face_src, attrs);
-  return *this;
-}
-CairoSVGWriter &
-CairoSVGWriter::font_face_uri(const CairoSVGWriter::AttrContainer &attrs) {
-  openTag(TagType::font_face_uri, attrs);
-  return *this;
-}
-CairoSVGWriter &
-CairoSVGWriter::foreignObject(const CairoSVGWriter::AttrContainer &attrs) {
-  openTag(TagType::foreignObject, attrs);
-  return *this;
-}
-CairoSVGWriter &CairoSVGWriter::g(const CairoSVGWriter::AttrContainer &attrs) {
-  openTag(TagType::g, attrs);
-  return *this;
-}
-CairoSVGWriter &
-CairoSVGWriter::glyph(const CairoSVGWriter::AttrContainer &attrs) {
-  openTag(TagType::glyph, attrs);
-  return *this;
-}
-CairoSVGWriter &
-CairoSVGWriter::glyphRef(const CairoSVGWriter::AttrContainer &attrs) {
-  openTag(TagType::glyphRef, attrs);
-  return *this;
-}
-CairoSVGWriter &
-CairoSVGWriter::hatch(const CairoSVGWriter::AttrContainer &attrs) {
-  openTag(TagType::hatch, attrs);
-  return *this;
-}
-CairoSVGWriter &
-CairoSVGWriter::hatchpath(const CairoSVGWriter::AttrContainer &attrs) {
-  openTag(TagType::hatchpath, attrs);
-  return *this;
-}
-CairoSVGWriter &
-CairoSVGWriter::hkern(const CairoSVGWriter::AttrContainer &attrs) {
-  openTag(TagType::hkern, attrs);
-  return *this;
-}
-CairoSVGWriter &
-CairoSVGWriter::image(const CairoSVGWriter::AttrContainer &attrs) {
-  openTag(TagType::image, attrs);
-  return *this;
-}
-CairoSVGWriter &
-CairoSVGWriter::line(const CairoSVGWriter::AttrContainer &attrs) {
-  openTag(TagType::line, attrs);
+void CairoSVGWriter::hatch_impl(const CairoSVGWriter::AttrContainer &attrs) {}
+void CairoSVGWriter::hatchpath_impl(
+    const CairoSVGWriter::AttrContainer &attrs) {}
+void CairoSVGWriter::hkern_impl(const CairoSVGWriter::AttrContainer &attrs) {}
+void CairoSVGWriter::image_impl(const CairoSVGWriter::AttrContainer &attrs) {}
+void CairoSVGWriter::line_impl(const CairoSVGWriter::AttrContainer &attrs) {
   CSSUnit x1, y1, x2, y2;
   struct AttrParser : public SVGAttributeVisitor<AttrParser> {
     AttrParser(CSSUnit &x1, CSSUnit &y1, CSSUnit &x2, CSSUnit &y2)
@@ -641,58 +458,22 @@ CairoSVGWriter::line(const CairoSVGWriter::AttrContainer &attrs) {
   cairo_move_to(cairo.get(), convertCSSWidth(x1), convertCSSHeight(y1));
   cairo_line_to(cairo.get(), convertCSSWidth(x2), convertCSSHeight(y2));
   applyCSSStroke(false);
-  return *this;
 }
-CairoSVGWriter &
-CairoSVGWriter::linearGradient(const CairoSVGWriter::AttrContainer &attrs) {
-  openTag(TagType::linearGradient, attrs);
-  return *this;
+void CairoSVGWriter::linearGradient_impl(
+    const CairoSVGWriter::AttrContainer &attrs) {}
+void CairoSVGWriter::marker_impl(const CairoSVGWriter::AttrContainer &attrs) {}
+void CairoSVGWriter::mask_impl(const CairoSVGWriter::AttrContainer &attrs) {}
+void CairoSVGWriter::mesh_impl(const CairoSVGWriter::AttrContainer &attrs) {}
+void CairoSVGWriter::meshgradient_impl(
+    const CairoSVGWriter::AttrContainer &attrs) {}
+void CairoSVGWriter::meshpatch_impl(
+    const CairoSVGWriter::AttrContainer &attrs) {}
+void CairoSVGWriter::meshrow_impl(const CairoSVGWriter::AttrContainer &attrs) {}
+void CairoSVGWriter::metadata_impl(const CairoSVGWriter::AttrContainer &attrs) {
 }
-CairoSVGWriter &
-CairoSVGWriter::marker(const CairoSVGWriter::AttrContainer &attrs) {
-  openTag(TagType::marker, attrs);
-  return *this;
-}
-CairoSVGWriter &
-CairoSVGWriter::mask(const CairoSVGWriter::AttrContainer &attrs) {
-  openTag(TagType::mask, attrs);
-  return *this;
-}
-CairoSVGWriter &
-CairoSVGWriter::mesh(const CairoSVGWriter::AttrContainer &attrs) {
-  openTag(TagType::mesh, attrs);
-  return *this;
-}
-CairoSVGWriter &
-CairoSVGWriter::meshgradient(const CairoSVGWriter::AttrContainer &attrs) {
-  openTag(TagType::meshgradient, attrs);
-  return *this;
-}
-CairoSVGWriter &
-CairoSVGWriter::meshpatch(const CairoSVGWriter::AttrContainer &attrs) {
-  openTag(TagType::meshpatch, attrs);
-  return *this;
-}
-CairoSVGWriter &
-CairoSVGWriter::meshrow(const CairoSVGWriter::AttrContainer &attrs) {
-  openTag(TagType::meshrow, attrs);
-  return *this;
-}
-CairoSVGWriter &
-CairoSVGWriter::metadata(const CairoSVGWriter::AttrContainer &attrs) {
-  openTag(TagType::metadata, attrs);
-  return *this;
-}
-CairoSVGWriter &
-CairoSVGWriter::missing_glyph(const CairoSVGWriter::AttrContainer &attrs) {
-  openTag(TagType::missing_glyph, attrs);
-  return *this;
-}
-CairoSVGWriter &
-CairoSVGWriter::mpath(const CairoSVGWriter::AttrContainer &attrs) {
-  openTag(TagType::mpath, attrs);
-  return *this;
-}
+void CairoSVGWriter::missing_glyph_impl(
+    const CairoSVGWriter::AttrContainer &attrs) {}
+void CairoSVGWriter::mpath_impl(const CairoSVGWriter::AttrContainer &attrs) {}
 
 static std::string_view ExtractPathArg(/* inout */ std::string_view &args) {
   auto End = std::find_if(args.begin(), args.end(),
@@ -983,8 +764,7 @@ CairoSVGWriter::CairoExecutePath(const char *pathRaw) {
   return {};
 }
 
-CairoSVGWriter &
-CairoSVGWriter::path(const CairoSVGWriter::AttrContainer &attrs) {
+void CairoSVGWriter::path_impl(const CairoSVGWriter::AttrContainer &attrs) {
   openTag(TagType::path, attrs);
   std::optional<SVGAttribute> pathDesc;
   struct AttrParser : public SVGAttributeVisitor<AttrParser> {
@@ -997,35 +777,18 @@ CairoSVGWriter::path(const CairoSVGWriter::AttrContainer &attrs) {
   for (const SVGAttribute &Attr : attrs)
     attrParser.visit(Attr);
   if (!pathDesc)
-    return *this;
+    return;
   if (auto err = CairoExecutePath(pathDesc->cstrOrNull()))
     svg_unreachable(err.to_error().what().c_str());
   applyCSSFillAndStroke(false);
-  return *this;
 }
-CairoSVGWriter &
-CairoSVGWriter::pattern(const CairoSVGWriter::AttrContainer &attrs) {
-  openTag(TagType::pattern, attrs);
-  return *this;
+void CairoSVGWriter::pattern_impl(const CairoSVGWriter::AttrContainer &attrs) {}
+void CairoSVGWriter::polygon_impl(const CairoSVGWriter::AttrContainer &attrs) {}
+void CairoSVGWriter::polyline_impl(const CairoSVGWriter::AttrContainer &attrs) {
 }
-CairoSVGWriter &
-CairoSVGWriter::polygon(const CairoSVGWriter::AttrContainer &attrs) {
-  openTag(TagType::polygon, attrs);
-  return *this;
-}
-CairoSVGWriter &
-CairoSVGWriter::polyline(const CairoSVGWriter::AttrContainer &attrs) {
-  openTag(TagType::polyline, attrs);
-  return *this;
-}
-CairoSVGWriter &
-CairoSVGWriter::radialGradient(const CairoSVGWriter::AttrContainer &attrs) {
-  openTag(TagType::radialGradient, attrs);
-  return *this;
-}
-CairoSVGWriter &
-CairoSVGWriter::rect(const CairoSVGWriter::AttrContainer &attrs) {
-  openTag(TagType::rect, attrs);
+void CairoSVGWriter::radialGradient_impl(
+    const CairoSVGWriter::AttrContainer &attrs) {}
+void CairoSVGWriter::rect_impl(const CairoSVGWriter::AttrContainer &attrs) {
   CSSUnit x, y, width = styles.getWidth(), height = styles.getHeight();
   struct AttrParser : public SVGAttributeVisitor<AttrParser> {
     AttrParser(CSSUnit &x, CSSUnit &y) : x(x), y(y) {}
@@ -1039,35 +802,14 @@ CairoSVGWriter::rect(const CairoSVGWriter::AttrContainer &attrs) {
   cairo_rectangle(cairo.get(), convertCSSWidth(x), convertCSSHeight(y),
                   convertCSSWidth(width), convertCSSHeight(height));
   applyCSSFillAndStroke(false);
-  return *this;
 }
-CairoSVGWriter &
-CairoSVGWriter::script(const CairoSVGWriter::AttrContainer &attrs) {
-  openTag(TagType::script, attrs);
-  return *this;
-}
-CairoSVGWriter &
-CairoSVGWriter::set(const CairoSVGWriter::AttrContainer &attrs) {
-  openTag(TagType::set, attrs);
-  return *this;
-}
-CairoSVGWriter &
-CairoSVGWriter::solidcolor(const CairoSVGWriter::AttrContainer &attrs) {
-  openTag(TagType::solidcolor, attrs);
-  return *this;
-}
-CairoSVGWriter &
-CairoSVGWriter::stop(const CairoSVGWriter::AttrContainer &attrs) {
-  openTag(TagType::stop, attrs);
-  return *this;
-}
-CairoSVGWriter &
-CairoSVGWriter::style(const CairoSVGWriter::AttrContainer &attrs) {
-  openTag(TagType::style, attrs);
-  return *this;
-}
-CairoSVGWriter &
-CairoSVGWriter::svg(const CairoSVGWriter::AttrContainer &attrs) {
+void CairoSVGWriter::script_impl(const CairoSVGWriter::AttrContainer &attrs) {}
+void CairoSVGWriter::set_impl(const CairoSVGWriter::AttrContainer &attrs) {}
+void CairoSVGWriter::solidcolor_impl(
+    const CairoSVGWriter::AttrContainer &attrs) {}
+void CairoSVGWriter::stop_impl(const CairoSVGWriter::AttrContainer &attrs) {}
+void CairoSVGWriter::style_impl(const CairoSVGWriter::AttrContainer &attrs) {}
+void CairoSVGWriter::svg_impl(const CairoSVGWriter::AttrContainer &attrs) {
   if (!width && !height) {
     // We're allowed to read the document dimension from the svg tag.
     // If this isn't possible, fall back to defaults __and do not try again__.
@@ -1099,23 +841,11 @@ CairoSVGWriter::svg(const CairoSVGWriter::AttrContainer &attrs) {
     // Default dimensions might have changed, so re-init Cairo
     initCairo();
   }
-  openTag(TagType::svg, attrs);
   cairo_push_group(cairo.get());
-  return *this;
 }
-CairoSVGWriter &
-CairoSVGWriter::switch_(const CairoSVGWriter::AttrContainer &attrs) {
-  openTag(TagType::switch_, attrs);
-  return *this;
-}
-CairoSVGWriter &
-CairoSVGWriter::symbol(const CairoSVGWriter::AttrContainer &attrs) {
-  openTag(TagType::symbol, attrs);
-  return *this;
-}
-CairoSVGWriter &
-CairoSVGWriter::text(const CairoSVGWriter::AttrContainer &attrs) {
-  openTag(TagType::text, attrs);
+void CairoSVGWriter::switch__impl(const CairoSVGWriter::AttrContainer &attrs) {}
+void CairoSVGWriter::symbol_impl(const CairoSVGWriter::AttrContainer &attrs) {}
+void CairoSVGWriter::text_impl(const CairoSVGWriter::AttrContainer &attrs) {
   CSSUnit x, y;
   struct AttrParser : public SVGAttributeVisitor<AttrParser> {
     AttrParser(CSSUnit &x, CSSUnit &y) : x(x), y(y) {}
@@ -1127,45 +857,13 @@ CairoSVGWriter::text(const CairoSVGWriter::AttrContainer &attrs) {
   for (const SVGAttribute &Attr : attrs)
     attrParser.visit(Attr);
   cairo_move_to(cairo.get(), convertCSSWidth(x), convertCSSHeight(y));
-  return *this;
 }
-CairoSVGWriter &
-CairoSVGWriter::textPath(const CairoSVGWriter::AttrContainer &attrs) {
-  openTag(TagType::textPath, attrs);
-  return *this;
+void CairoSVGWriter::textPath_impl(const CairoSVGWriter::AttrContainer &attrs) {
 }
-CairoSVGWriter &
-CairoSVGWriter::title(const CairoSVGWriter::AttrContainer &attrs) {
-  openTag(TagType::title, attrs);
-  return *this;
-}
-CairoSVGWriter &
-CairoSVGWriter::tref(const CairoSVGWriter::AttrContainer &attrs) {
-  openTag(TagType::tref, attrs);
-  return *this;
-}
-CairoSVGWriter &
-CairoSVGWriter::tspan(const CairoSVGWriter::AttrContainer &attrs) {
-  openTag(TagType::tspan, attrs);
-  return *this;
-}
-CairoSVGWriter &
-CairoSVGWriter::unknown(const CairoSVGWriter::AttrContainer &attrs) {
-  openTag(TagType::unknown, attrs);
-  return *this;
-}
-CairoSVGWriter &
-CairoSVGWriter::use(const CairoSVGWriter::AttrContainer &attrs) {
-  openTag(TagType::use, attrs);
-  return *this;
-}
-CairoSVGWriter &
-CairoSVGWriter::view(const CairoSVGWriter::AttrContainer &attrs) {
-  openTag(TagType::view, attrs);
-  return *this;
-}
-CairoSVGWriter &
-CairoSVGWriter::vkern(const CairoSVGWriter::AttrContainer &attrs) {
-  openTag(TagType::vkern, attrs);
-  return *this;
-}
+void CairoSVGWriter::title_impl(const CairoSVGWriter::AttrContainer &attrs) {}
+void CairoSVGWriter::tref_impl(const CairoSVGWriter::AttrContainer &attrs) {}
+void CairoSVGWriter::tspan_impl(const CairoSVGWriter::AttrContainer &attrs) {}
+void CairoSVGWriter::unknown_impl(const CairoSVGWriter::AttrContainer &attrs) {}
+void CairoSVGWriter::use_impl(const CairoSVGWriter::AttrContainer &attrs) {}
+void CairoSVGWriter::view_impl(const CairoSVGWriter::AttrContainer &attrs) {}
+void CairoSVGWriter::vkern_impl(const CairoSVGWriter::AttrContainer &attrs) {}

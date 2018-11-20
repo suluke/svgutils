@@ -45,7 +45,8 @@ public:
     NAME(attrsVec);                                                            \
     return *this;                                                              \
   }                                                                            \
-  self_t &NAME(const AttrContainer &attrs);
+  self_t &NAME(const AttrContainer &attrs);                                    \
+  void NAME##_impl(const AttrContainer &attrs);
 #include "svgutils/svg_entities.def"
   template <typename... attrs_t>
   self_t &custom_tag(const char *name, attrs_t...) {
