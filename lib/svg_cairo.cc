@@ -475,14 +475,70 @@ void CairoSVGWriter::missing_glyph_impl(
     const CairoSVGWriter::AttrContainer &attrs) {}
 void CairoSVGWriter::mpath_impl(const CairoSVGWriter::AttrContainer &attrs) {}
 
+// Grammar for SVG paths: https://www.w3.org/TR/SVG11/paths.html#PathDataBNF
 static std::string_view ExtractPathArg(/* inout */ std::string_view &args) {
-  auto End = std::find_if(args.begin(), args.end(),
-                          [](char C) { return C == ',' || std::isspace(C); });
+  constexpr const char *Error = "";
+  if (args.empty())
+    return Error;
+  assert(!std::isspace(args.front()) && "Expected trimmed argument string");
+  // Numbers must start with +, -, . or digit
+  if (!std::isdigit(args.front()) && args.front() != '+' &&
+      args.front() != '-' && args.front() != '.')
+    return Error;
+  // args.begin() != args.end() because !args.empty()
+  std::string_view::iterator End = args.begin();
+  bool hasDigit = false;
+  if (*End == '+' || *End == '-') {
+    ++End; // Move past +|-
+    if (End == args.end())
+      return Error; // Cannot end after +|-
+  }
+  if (*End != '.') {
+    // consume leading digits
+    while (End != args.end() && std::isdigit(*End)) {
+      hasDigit = true;
+      ++End;
+    }
+    if (!hasDigit)
+      return Error; // We might have skipped past +|- and no '.' was found. By
+                    // now there must have been a digit.
+  }
+  if (End != args.end() && *End == '.') {
+    ++End; // Move past '.'
+    // consume decimal digits
+    while (End != args.end() && std::isdigit(*End)) {
+      hasDigit = true;
+      ++End;
+    }
+    if (!hasDigit)
+      return Error; // '.' requires digit either before or after
+  }
+  if (End != args.end() && (*End == 'e' || *End == 'E')) {
+    ++End; // Move past e|E
+    if (End == args.end())
+      return Error; // Cannot stop after e|E
+    if (*End == '+' || *End == '-')
+      ++End;
+    if (End == args.end() || !std::isdigit(*End))
+      return Error; // Cannot stop after +|-
+    hasDigit = false;
+    while (End != args.end() && std::isdigit(*End)) {
+      hasDigit = true;
+      ++End;
+    }
+    if (!hasDigit)
+      return Error; // No digit in exponent
+  }
+
   std::string_view argStr = args.substr(0, End - args.begin());
   if (End == args.end())
     args.remove_prefix(args.size());
-  else
+  // If the value is delimited by a comma or space, the delimiter should
+  // be dropped as well
+  else if (std::isspace(*End) || *End == ',')
     args.remove_prefix((End - args.begin()) + 1);
+  else
+    args.remove_prefix(End - args.begin());
   args = strview_trim(args);
   argStr = strview_trim(argStr);
   return argStr;
