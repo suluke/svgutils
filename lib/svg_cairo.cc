@@ -225,7 +225,7 @@ void CairoSVGWriter::closeTag() {
 
 void CairoSVGWriter::openTag(TagType T,
                              const CairoSVGWriter::AttrContainer &attrs) {
-  if (!width && !height) {
+  if (T != TagType::svg && !width && !height) {
     width = dfltWidth;
     height = dfltHeight;
   }
