@@ -86,7 +86,13 @@ private:
   OwnedCairo cairo = {nullptr, nullptr};
 
   enum class TagType;
+  friend outstream_t &operator<<(outstream_t &os, TagType tag);
   TagType currentTag;
+  /// When a custom tag is opened, we ignore it. However, we still want
+  /// to allow entering the custom tag and inserting even more tags (which
+  /// we also ignore). This field keeps track of how deep we have `enter`ed
+  /// into ignored tags
+  size_t ignore = 0;
   std::stack<TagType> parents;
 
   void openTag(TagType T, const AttrContainer &attrs);

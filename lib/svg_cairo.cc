@@ -20,9 +20,29 @@ static void cairo_deleter(cairo_t *cr) {
 enum class CairoSVGWriter::TagType {
   NONE = 0,
   CUSTOM,
-#define SVG_TAG(NAME, STR, ...) NAME,
+#define SVG_TAG(NAME, STR) NAME,
 #include "svgutils/svg_entities.def"
 };
+namespace svg {
+outstream_t &operator<<(outstream_t &os, CairoSVGWriter::TagType tag) {
+  using TagType = CairoSVGWriter::TagType;
+  switch (tag) {
+  case TagType::NONE:
+    os << "NONE";
+    break;
+  case TagType::CUSTOM:
+    os << "CUSTOM TAG";
+#define SVG_TAG(NAME, STR)                                                     \
+  case TagType::NAME:                                                          \
+    os << "<" STR ">";                                                         \
+    break;
+#include "svgutils/svg_entities.def"
+  default:
+    svg_unreachable("Encountered unknown tag type");
+  }
+  return os;
+}
+} // namespace svg
 
 void CairoSVGWriter::initCairo() {
   double w = width ? width : dfltWidth;
@@ -71,15 +91,21 @@ CairoSVGWriter::custom_tag(const char *name,
 
 CairoSVGWriter &CairoSVGWriter::content(const char *text) {
   closeTag();
-  // Reference:
-  // https://github.com/Distrotech/cairo/blob/17ef4acfcb64d1c525910a200e60d63087953c4c/src/cairo.c#L3197
-  if (parents.top() == TagType::CUSTOM)
+  if (ignore)
     return *this;
-  assert(parents.size() && parents.top() == TagType::text &&
-         "Content is only supported in text nodes at the moment");
   if (text == nullptr)
     return *this;
-
+  if (!parents.size())
+    svg_unreachable("Encountered stray text on the top level of the document");
+  TagType parentTag = parents.top();
+  if (parentTag != TagType::text) {
+    std::cerr << "Content is only supported in text nodes at the "
+                 "moment.\nContent for tag "
+              << parentTag << " will be ignored\n";
+    return *this;
+  }
+  // How cairo_show_text does it:
+  // https://github.com/Distrotech/cairo/blob/17ef4acfcb64d1c525910a200e60d63087953c4c/src/cairo.c#L3197
   if (cairo_status(cairo.get()))
     svg_unreachable("Cairo is in an invalid state");
 
@@ -181,17 +207,22 @@ CairoSVGWriter &CairoSVGWriter::comment(const char *comment) { return *this; }
 
 CairoSVGWriter &CairoSVGWriter::enter() {
   assert(currentTag != TagType::NONE && "Cannot enter without root tag");
+  if (currentTag == TagType::CUSTOM || ignore)
+    ++ignore;
   parents.push(currentTag);
   currentTag = TagType::NONE;
   return *this;
 }
 CairoSVGWriter &CairoSVGWriter::leave() {
   assert(parents.size() && "Cannot leave: No parent tag");
+  if (ignore)
+    --ignore;
   currentTag = parents.top();
   parents.pop();
   return *this;
 }
 CairoSVGWriter &CairoSVGWriter::finish() {
+  ignore = 0;
   while (parents.size())
     leave();
   closeTag();
@@ -218,8 +249,12 @@ void CairoSVGWriter::closeTag() {
     }
     styles.pop();
     currentTag = TagType::NONE;
-    assert(cairo_status(cairo.get()) == CAIRO_STATUS_SUCCESS &&
-           "Cairo is in an invalid state");
+    cairo_status_t status = cairo_status(cairo.get());
+    if (status != CAIRO_STATUS_SUCCESS) {
+      const char *errMsg = cairo_status_to_string(status);
+      std::cerr << errMsg << '\n';
+      svg_unreachable("Cairo is in an invalid state");
+    }
   }
 }
 
@@ -329,6 +364,8 @@ void CairoSVGWriter::applyCSSFillAndStroke(bool preserve) {
 
 #define SVG_TAG(NAME, STR, ...)                                                \
   CairoSVGWriter &CairoSVGWriter::NAME(const AttrContainer &attrs) {           \
+    if (ignore)                                                                \
+      return *this;                                                            \
     openTag(TagType::NAME, attrs);                                             \
     NAME##_impl(attrs);                                                        \
     return *this;                                                              \
@@ -834,6 +871,8 @@ void CairoSVGWriter::path_impl(const CairoSVGWriter::AttrContainer &attrs) {
     attrParser.visit(Attr);
   if (!pathDesc)
     return;
+  // Just in case someone decides to start with a relative command
+  cairo_move_to(cairo.get(), 0., 0.);
   if (auto err = CairoExecutePath(pathDesc->cstrOrNull()))
     svg_unreachable(err.to_error().what().c_str());
   applyCSSFillAndStroke(false);
