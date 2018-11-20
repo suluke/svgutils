@@ -15,8 +15,7 @@ template <typename WrappedTy> struct SVGLoggingWriter {
 #define SVG_TAG(NAME, STR, ...)                                                \
   template <typename... attrs_t> self_t &NAME(attrs_t... attrs) {              \
     std::vector<SVGAttribute> attrsVec({std::forward<attrs_t>(attrs)...});     \
-    NAME(attrsVec);                                                            \
-    return *this;                                                              \
+    return NAME(attrsVec);                                                     \
   }                                                                            \
   template <typename container_t> self_t &NAME(const container_t &attrs) {     \
     log(#NAME, &attrs);                                                        \
@@ -25,6 +24,23 @@ template <typename WrappedTy> struct SVGLoggingWriter {
   }
 #include "svgutils/svg_entities.def"
 
+  template <typename... attrs_t>
+  self_t &custom_tag(const char *tagname, attrs_t... attrs) {
+    std::vector<SVGAttribute> attrsVec({std::forward<attrs_t>(attrs)...});
+    return custom_tag(tagname, attrsVec);
+  }
+  template <typename container_t>
+  self_t &custom_tag(const char *tagname, const container_t &attrs) {
+    log(tagname, &attrs);
+    writer.custom_tag(tagname, attrs);
+    return *this;
+  }
+
+  self_t &comment(const char *comment) {
+    log<std::vector<SVGAttribute>>("comment", nullptr, comment);
+    writer.comment(comment);
+    return *this;
+  }
   self_t &content(const char *text) {
     log<std::vector<SVGAttribute>>("content", nullptr, text);
     writer.content(text);
@@ -46,6 +62,8 @@ template <typename WrappedTy> struct SVGLoggingWriter {
     writer.finish();
     return *this;
   }
+
+  WrappedTy &getWriter() { return writer; }
 
   void log(const char *action) { log<std::vector<SVGAttribute>>(action); }
 
