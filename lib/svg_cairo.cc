@@ -512,27 +512,73 @@ void CairoSVGWriter::missing_glyph_impl(
     const CairoSVGWriter::AttrContainer &attrs) {}
 void CairoSVGWriter::mpath_impl(const CairoSVGWriter::AttrContainer &attrs) {}
 
+struct PathFlag {
+  PathFlag() = default;
+  explicit PathFlag(char flag) : flag(flag) {}
+  PathFlag(const PathFlag &) = default;
+  PathFlag &operator=(const PathFlag &) = default;
+  PathFlag(PathFlag &&) = default;
+  PathFlag &operator=(PathFlag &&) = default;
+
+  operator bool() const { return flag; }
+  char getValue() const {
+    assert((flag == '0' || flag == '1') &&
+           "Unchecked extraction of PathFlag value");
+    return flag;
+  }
+
+private:
+  char flag = 0;
+};
+
+template <bool Signed> struct PathNumber {
+  PathNumber() = default;
+  PathNumber(const PathNumber &) = default;
+  PathNumber &operator=(const PathNumber &) = default;
+  PathNumber(PathNumber &&) = default;
+  PathNumber &operator=(PathNumber &&) = default;
+
+  operator bool() const { return number.size(); }
+  const std::string_view &operator*() const {
+    assert(*this && "Unchecked extraction of PathNumber value");
+    return number;
+  }
+  double toDouble() const {
+    assert(*this && "Unchecked extraction of PathNumber value");
+    return *strview_to_double(number);
+  }
+  static PathNumber Extract(/* inout */ std::string_view &str);
+
+private:
+  explicit PathNumber(const std::string_view &number) : number(number) {}
+  std::string_view number;
+};
+
 // Grammar for SVG paths: https://www.w3.org/TR/SVG11/paths.html#PathDataBNF
-static std::string_view ExtractPathArg(/* inout */ std::string_view &args) {
-  constexpr const char *Error = "";
-  if (args.empty())
+template <bool Signed>
+PathNumber<Signed>
+PathNumber<Signed>::Extract(/* inout */ std::string_view &str) {
+  PathNumber<Signed> Error;
+  if (str.empty())
     return Error;
-  assert(!std::isspace(args.front()) && "Expected trimmed argument string");
+  assert(!std::isspace(str.front()) && "Expected trimmed argument string");
   // Numbers must start with +, -, . or digit
-  if (!std::isdigit(args.front()) && args.front() != '+' &&
-      args.front() != '-' && args.front() != '.')
+  if (!std::isdigit(str.front()) && str.front() != '+' && str.front() != '-' &&
+      str.front() != '.')
     return Error;
-  // args.begin() != args.end() because !args.empty()
-  std::string_view::iterator End = args.begin();
+  if (!Signed && (str.front() == '+' || str.front() == '-'))
+    return Error;
+  // str.begin() != str.end() because !str.empty()
+  std::string_view::iterator End = str.begin();
   bool hasDigit = false;
   if (*End == '+' || *End == '-') {
     ++End; // Move past +|-
-    if (End == args.end())
+    if (End == str.end())
       return Error; // Cannot end after +|-
   }
   if (*End != '.') {
     // consume leading digits
-    while (End != args.end() && std::isdigit(*End)) {
+    while (End != str.end() && std::isdigit(*End)) {
       hasDigit = true;
       ++End;
     }
@@ -540,26 +586,26 @@ static std::string_view ExtractPathArg(/* inout */ std::string_view &args) {
       return Error; // We might have skipped past +|- and no '.' was found. By
                     // now there must have been a digit.
   }
-  if (End != args.end() && *End == '.') {
+  if (End != str.end() && *End == '.') {
     ++End; // Move past '.'
     // consume decimal digits
-    while (End != args.end() && std::isdigit(*End)) {
+    while (End != str.end() && std::isdigit(*End)) {
       hasDigit = true;
       ++End;
     }
     if (!hasDigit)
       return Error; // '.' requires digit either before or after
   }
-  if (End != args.end() && (*End == 'e' || *End == 'E')) {
+  if (End != str.end() && (*End == 'e' || *End == 'E')) {
     ++End; // Move past e|E
-    if (End == args.end())
+    if (End == str.end())
       return Error; // Cannot stop after e|E
     if (*End == '+' || *End == '-')
       ++End;
-    if (End == args.end() || !std::isdigit(*End))
+    if (End == str.end() || !std::isdigit(*End))
       return Error; // Cannot stop after +|-
     hasDigit = false;
-    while (End != args.end() && std::isdigit(*End)) {
+    while (End != str.end() && std::isdigit(*End)) {
       hasDigit = true;
       ++End;
     }
@@ -567,18 +613,20 @@ static std::string_view ExtractPathArg(/* inout */ std::string_view &args) {
       return Error; // No digit in exponent
   }
 
-  std::string_view argStr = args.substr(0, End - args.begin());
-  if (End == args.end())
-    args.remove_prefix(args.size());
-  // If the value is delimited by a comma or space, the delimiter should
-  // be dropped as well
-  else if (std::isspace(*End) || *End == ',')
-    args.remove_prefix((End - args.begin()) + 1);
-  else
-    args.remove_prefix(End - args.begin());
-  args = strview_trim(args);
-  argStr = strview_trim(argStr);
-  return argStr;
+  std::string_view argStr = str.substr(0, End - str.begin());
+  if (End == str.end())
+    str.remove_prefix(str.size());
+  else {
+    str.remove_prefix(End - str.begin());
+    // If the value is delimited by a comma or spaces, the delimiter should
+    // be dropped as well
+    str = strview_trim(str);
+    if (str.front() == ',') {
+      str.remove_prefix(1);
+      str = strview_trim(str);
+    }
+  }
+  return PathNumber<Signed>(argStr);
 }
 
 static bool ExtractPathArgs(/* inout */ std::string_view &argsStr) {
@@ -587,10 +635,28 @@ static bool ExtractPathArgs(/* inout */ std::string_view &argsStr) {
 
 template <typename... args_t>
 static bool ExtractPathArgs(/* inout */ std::string_view &argsStr,
-                            /* out */ std::string_view &arg1,
+                            /* out */ PathFlag &arg1, args_t &... argn) {
+  if (argsStr.front() == '0' || argsStr.front() == '1') {
+    arg1 = PathFlag(argsStr.front());
+    argsStr.remove_prefix(1);
+    // consume any whitespace
+    argsStr = strview_trim(argsStr);
+    // also consume comma if present
+    if (argsStr.front() == ',') {
+      argsStr.remove_prefix(1);
+      argsStr = strview_trim(argsStr);
+    }
+  } else
+    return false;
+  return ExtractPathArgs(argsStr, argn...);
+}
+
+template <bool Signed, typename... args_t>
+static bool ExtractPathArgs(/* inout */ std::string_view &argsStr,
+                            /* out */ PathNumber<Signed> &arg1,
                             args_t &... argn) {
-  arg1 = ExtractPathArg(argsStr);
-  if (arg1.empty())
+  arg1 = PathNumber<Signed>::Extract(argsStr);
+  if (!arg1)
     return false;
   return ExtractPathArgs(argsStr, argn...);
 }
@@ -599,17 +665,17 @@ CairoSVGWriter::PathErrorOr<CairoSVGWriter::ControlPoint>
 CairoSVGWriter::CairoExecuteCubicBezier(std::string_view args, bool rel) {
   if (args.empty())
     return PathError("No arguments given to C/c command");
-  std::string_view cp1X, cp1Y, cp2X, cp2Y, destX, destY;
+  PathNumber<true> cp1X, cp1Y, cp2X, cp2Y, destX, destY;
   ControlPoint CP;
   while (args.size()) {
     if (!ExtractPathArgs(args, cp1X, cp1Y, cp2X, cp2Y, destX, destY))
       return PathError("Not enough arguments given to C/c command");
-    auto x1 = strview_to_double(cp1X);
-    auto y1 = strview_to_double(cp1Y);
-    auto x2 = strview_to_double(cp2X);
-    auto y2 = strview_to_double(cp2Y);
-    auto x3 = strview_to_double(destX);
-    auto y3 = strview_to_double(destY);
+    auto x1 = strview_to_double(*cp1X);
+    auto y1 = strview_to_double(*cp1Y);
+    auto x2 = strview_to_double(*cp2X);
+    auto y2 = strview_to_double(*cp2Y);
+    auto x3 = strview_to_double(*destX);
+    auto y3 = strview_to_double(*destY);
     if (!(x1 && y1 && x2 && y2 && x3 && y3))
       return PathError("Invalid arguments given to C/c command");
     if (rel) {
@@ -630,7 +696,7 @@ CairoSVGWriter::CairoExecuteSmoothCubicBezier(
     const std::optional<ControlPoint> &PrevCP) {
   if (args.empty())
     return PathError("No arguments given to S/s command");
-  std::string_view x2, y2, x3, y3;
+  PathNumber<true> x2, y2, x3, y3;
   ControlPoint CP;
   while (args.size()) {
     if (!ExtractPathArgs(args, x2, y2, x3, y3))
@@ -643,18 +709,18 @@ CairoSVGWriter::PathErrorOr<CairoSVGWriter::ControlPoint>
 CairoSVGWriter::CairoExecuteQuadraticBezier(std::string_view args, bool rel) {
   if (args.empty())
     return PathError("No arguments given to Q/q command");
-  std::string_view cpX, cpY, destX, destY;
+  PathNumber<true> cpX, cpY, destX, destY;
   ControlPoint CP;
   while (args.size()) {
     if (!ExtractPathArgs(args, cpX, cpY, destX, destY))
       return PathError("Not enough arguments given to Q/q command");
     double x0, y0;
     cairo_get_current_point(cairo.get(), &x0, &y0);
-    auto x3 = strview_to_double(destX);
-    auto y3 = strview_to_double(destY);
+    auto x3 = strview_to_double(*destX);
+    auto y3 = strview_to_double(*destY);
     // the quadratic curve's control point
-    auto qx = strview_to_double(cpX);
-    auto qy = strview_to_double(cpY);
+    auto qx = strview_to_double(*cpX);
+    auto qy = strview_to_double(*cpY);
     if (!(x3 && y3 && qx && qy))
       return PathError("Invalid arguments given to Q/q command");
     // https://stackoverflow.com/a/3162732/1468532
@@ -678,7 +744,7 @@ CairoSVGWriter::CairoExecuteSmoothQuadraticBezier(
     const std::optional<ControlPoint> &PrevCP) {
   if (args.empty())
     return PathError("No arguments given to T/t command");
-  std::string_view x3, y3;
+  PathNumber<true> x3, y3;
   ControlPoint CP;
   while (args.size()) {
     if (!ExtractPathArgs(args, x3, y3))
@@ -689,11 +755,111 @@ CairoSVGWriter::CairoExecuteSmoothQuadraticBezier(
 }
 CairoSVGWriter::PathErrorOrVoid
 CairoSVGWriter::CairoExecuteArc(std::string_view args, bool rel) {
-  std::string_view rx, ry, largeArcFlag, sweepFlag, x, y;
+  PathNumber<false> rxArg, ryArg;
+  PathNumber<true> angleArg, x1Arg, y1Arg;
+  PathFlag largeArcFlag, sweepFlag;
+  const double Pi = std::acos(-1.);
   while (args.size()) {
-    if (!ExtractPathArgs(args, rx, ry, largeArcFlag, sweepFlag, x, y))
+    if (!ExtractPathArgs(args, rxArg, ryArg, angleArg, largeArcFlag, sweepFlag,
+                         x1Arg, y1Arg))
       return PathError{"Not enough arguments given to A/a command"};
-    // TODO
+    double x0, y0, x1 = x1Arg.toDouble(), y1 = y1Arg.toDouble(),
+                   rx = rxArg.toDouble(), ry = ryArg.toDouble();
+    double rotate = angleArg.toDouble() / 180 * Pi;
+    cairo_get_current_point(cairo.get(), &x0, &y0);
+    if (rx == 0. || ry == 0.) {
+      if (rel)
+        cairo_rel_line_to(cairo.get(), x1, y1);
+      else
+        cairo_line_to(cairo.get(), x1, y1);
+      continue;
+    }
+    // Make x1/y1 absolute
+    if (rel) {
+      x1 += x0;
+      y1 += y0;
+    }
+
+    // Set up a projection matrix to work in a normalized space
+    cairo_matrix_t proj_matrix;
+    // Make the svg ellipsis a circle
+    cairo_matrix_init_scale(&proj_matrix, 1., rx / ry);
+    // Align the svg ellipsis with the x axis
+    cairo_matrix_rotate(&proj_matrix, -rotate);
+    // Center the coordinate system around current point
+    cairo_matrix_translate(&proj_matrix, -x0, -y0);
+
+    // also create the inverse projection matrix
+    cairo_matrix_t inverse_proj_matrix;
+    cairo_matrix_init_translate(&inverse_proj_matrix, x0, y0);
+    cairo_matrix_rotate(&inverse_proj_matrix, rotate);
+    cairo_matrix_scale(&inverse_proj_matrix, 1., ry / rx);
+
+    // We now want to find the points c1/c2 that are 'rx' far away from the two
+    // points
+    double connx = x1, conny = y1; // connection point from x0 to x1.
+    // After the previous transformations, conn is just the projection of p1.
+    cairo_matrix_transform_point(&proj_matrix, &connx, &conny);
+    const double connLen = std::sqrt(std::pow(connx, 2.) + std::pow(conny, 2.));
+    const double midx = connx / 2.,
+                 midy = conny / 2.; // Halfway point from p0 tp p1
+    const double midLen = connLen / 2.;
+    double cos = midLen / rx;
+    if (cos > 1.) {
+      ry *= midLen / rx;
+      rx = midLen;
+      cos = 1.;
+    }
+    std::cerr << "cos: " << cos << '\n';
+    const double teta = std::acos(cos);
+    std::cerr << "teta: " << teta / Pi * 180 << " degrees\n";
+    const double midToCLen = rx * std::sin(teta);
+    double normx = conny / connLen, normy = -connx / connLen;
+    double cx1 = midx + normx * midToCLen, cy1 = midy + normy * midToCLen;
+    double cx2 = midx - normx * midToCLen, cy2 = midy - normy * midToCLen;
+
+    double startAngle1 = std::atan(cy1 / cx1) + Pi;
+    double startAngle2 = std::atan(cy2 / cx2) + Pi;
+    double angleOffset = (Pi - 2. * teta);
+    // unproject circle centers
+    cairo_matrix_transform_point(&inverse_proj_matrix, &cx1, &cy1);
+    cairo_matrix_transform_point(&inverse_proj_matrix, &cx2, &cy2);
+    // Remember: Since y points down, angles are clock-wise.
+    // We have calculated with ccw angles, so some negatives are necessary
+    // below.
+    double startAngle, endAngle, cx, cy;
+    if (largeArcFlag.getValue() == sweepFlag.getValue()) {
+      cx = cx1;
+      cy = cy1;
+      startAngle = startAngle1;
+      endAngle = startAngle - angleOffset;
+    } else {
+      cx = cx2;
+      cy = cy2;
+      startAngle = startAngle2;
+      endAngle = startAngle + angleOffset;
+    }
+    if (x0 > x1) {
+      startAngle += Pi;
+      endAngle += Pi;
+    }
+    // Save the current matrix
+    cairo_matrix_t save_matrix;
+    cairo_get_matrix(cairo.get(), &save_matrix);
+
+    // Apply rotation and scaling again
+    cairo_translate(cairo.get(), cx, cy);
+    cairo_rotate(cairo.get(), rotate);
+    cairo_scale(cairo.get(), 1., ry / rx);
+    cairo_translate(cairo.get(), -cx, -cy);
+    // cairo_translate(cairo.get(), -x0, -y0);
+
+    if (sweepFlag.getValue() == '0')
+      cairo_arc_negative(cairo.get(), cx, cy, rx, startAngle, endAngle);
+    else
+      cairo_arc(cairo.get(), cx, cy, rx, startAngle, endAngle);
+    cairo_set_matrix(cairo.get(), &save_matrix);
+    cairo_move_to(cairo.get(), x1, y1);
   }
   return {};
 }
@@ -703,10 +869,10 @@ CairoSVGWriter::CairoExecuteHLine(std::string_view length, bool rel) {
   double X, Y;
   cairo_get_current_point(cairo.get(), &X, &Y);
   while (length.size()) {
-    std::string_view lenStr;
+    PathNumber<true> lenStr;
     if (!ExtractPathArgs(length, lenStr))
       return PathError{"No argument given to H/h command"};
-    CSSUnit lenCss = CSSUnit::parse(lenStr);
+    CSSUnit lenCss = CSSUnit::parse(*lenStr);
     double len = convertCSSWidth(lenCss);
     if (rel)
       cairo_rel_line_to(cairo.get(), len, 0);
@@ -720,10 +886,10 @@ CairoSVGWriter::CairoExecuteVLine(std::string_view length, bool rel) {
   double X, Y;
   cairo_get_current_point(cairo.get(), &X, &Y);
   while (length.size()) {
-    std::string_view lenStr;
+    PathNumber<true> lenStr;
     if (!ExtractPathArgs(length, lenStr))
       return PathError{"No argument given to V/v command"};
-    CSSUnit lenCss = CSSUnit::parse(lenStr);
+    CSSUnit lenCss = CSSUnit::parse(*lenStr);
     double len = convertCSSHeight(lenCss);
     if (rel)
       cairo_rel_line_to(cairo.get(), 0, len);
@@ -736,11 +902,11 @@ CairoSVGWriter::CairoExecuteVLine(std::string_view length, bool rel) {
 CairoSVGWriter::PathErrorOrVoid
 CairoSVGWriter::CairoExecuteLineTo(std::string_view points, bool rel) {
   while (points.size()) {
-    std::string_view xStr, yStr;
+    PathNumber<true> xStr, yStr;
     if (!ExtractPathArgs(points, xStr, yStr))
       return PathError{"Not enough arguments given to L/l command"};
-    CSSUnit xCss = CSSUnit::parse(xStr);
-    CSSUnit yCss = CSSUnit::parse(yStr);
+    CSSUnit xCss = CSSUnit::parse(*xStr);
+    CSSUnit yCss = CSSUnit::parse(*yStr);
     double x = convertCSSWidth(xCss);
     double y = convertCSSHeight(yCss);
     if (rel)
@@ -754,11 +920,11 @@ CairoSVGWriter::PathErrorOrVoid
 CairoSVGWriter::CairoExecuteMoveTo(std::string_view points, bool rel) {
   if (points.empty())
     return PathError{"No arguments given to M/m command"};
-  std::string_view xStr, yStr;
+  PathNumber<true> xStr, yStr;
   if (!ExtractPathArgs(points, xStr, yStr))
     return PathError("Not enough arguments given to M/m command");
-  CSSUnit xCss = CSSUnit::parse(xStr);
-  CSSUnit yCss = CSSUnit::parse(yStr);
+  CSSUnit xCss = CSSUnit::parse(*xStr);
+  CSSUnit yCss = CSSUnit::parse(*yStr);
   double x = convertCSSWidth(xCss);
   double y = convertCSSHeight(yCss);
   if (rel)
