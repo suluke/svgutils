@@ -665,27 +665,21 @@ CairoSVGWriter::PathErrorOr<CairoSVGWriter::ControlPoint>
 CairoSVGWriter::CairoExecuteCubicBezier(std::string_view args, bool rel) {
   if (args.empty())
     return PathError("No arguments given to C/c command");
-  PathNumber<true> cp1X, cp1Y, cp2X, cp2Y, destX, destY;
+  PathNumber<true> x1Arg, y1Arg, x2Arg, y2Arg, x3Arg, y3Arg;
   ControlPoint CP;
   while (args.size()) {
-    if (!ExtractPathArgs(args, cp1X, cp1Y, cp2X, cp2Y, destX, destY))
+    if (!ExtractPathArgs(args, x1Arg, y1Arg, x2Arg, y2Arg, x3Arg, y3Arg))
       return PathError("Not enough arguments given to C/c command");
-    auto x1 = strview_to_double(*cp1X);
-    auto y1 = strview_to_double(*cp1Y);
-    auto x2 = strview_to_double(*cp2X);
-    auto y2 = strview_to_double(*cp2Y);
-    auto x3 = strview_to_double(*destX);
-    auto y3 = strview_to_double(*destY);
-    if (!(x1 && y1 && x2 && y2 && x3 && y3))
-      return PathError("Invalid arguments given to C/c command");
+    double x1 = x1Arg.toDouble(), y1 = y1Arg.toDouble(), x2 = x2Arg.toDouble(),
+           y2 = y2Arg.toDouble(), x3 = x3Arg.toDouble(), y3 = y3Arg.toDouble();
     if (rel) {
       double x0, y0;
       cairo_get_current_point(cairo.get(), &x0, &y0);
-      CP = {x0 + *x2, y0 + *y2};
-      cairo_rel_curve_to(cairo.get(), *x1, *y1, *x2, *y2, *x3, *y3);
+      CP = {x0 + x2, y0 + y2};
+      cairo_rel_curve_to(cairo.get(), x1, y1, x2, y2, x3, y3);
     } else {
-      CP = {*x2, *y2};
-      cairo_curve_to(cairo.get(), *x1, *y1, *x2, *y2, *x3, *y3);
+      CP = {x2, y2};
+      cairo_curve_to(cairo.get(), x1, y1, x2, y2, x3, y3);
     }
   }
   return CP;
@@ -696,45 +690,75 @@ CairoSVGWriter::CairoExecuteSmoothCubicBezier(
     const std::optional<ControlPoint> &PrevCP) {
   if (args.empty())
     return PathError("No arguments given to S/s command");
-  PathNumber<true> x2, y2, x3, y3;
+  PathNumber<true> x2Arg, y2Arg, x3Arg, y3Arg;
   ControlPoint CP;
+  if (!PrevCP) {
+    double x0, y0;
+    cairo_get_current_point(cairo.get(), &x0, &y0);
+    CP = {x0, y0};
+  } else {
+    CP = *PrevCP;
+  }
   while (args.size()) {
-    if (!ExtractPathArgs(args, x2, y2, x3, y3))
+    if (!ExtractPathArgs(args, x2Arg, y2Arg, x3Arg, y3Arg))
       return PathError("Not enough arguments given to S/s command");
-    // TODO
+    double x0, y0, x2 = x2Arg.toDouble(), y2 = y2Arg.toDouble(),
+                   x3 = x3Arg.toDouble(), y3 = y3Arg.toDouble();
+    cairo_get_current_point(cairo.get(), &x0, &y0);
+    double x1 = x0 - CP.first, y1 = y0 - CP.second;
+    if (!rel) {
+      x1 += x0;
+      y1 += y0;
+    }
+    if (rel) {
+      CP = {x0 + x2, y0 + y2};
+      cairo_rel_curve_to(cairo.get(), x1, y1, x2, y2, x3, y3);
+    } else {
+      CP = {x2, y2};
+      cairo_curve_to(cairo.get(), x1, y1, x2, y2, x3, y3);
+    }
   }
   return CP;
 }
+
+using ControlPoint = std::pair<double, double>;
+static ControlPoint CairoDrawQuadraticCurve(cairo_t *cairo, double qx,
+                                            double qy, double x3, double y3,
+                                            bool rel) {
+  double x0 = 0., y0 = 0.;
+  if (!rel)
+    cairo_get_current_point(cairo, &x0, &y0);
+  // https://stackoverflow.com/a/3162732/1468532
+  double x1 = x0 + 2. / 3. * (qx - x0);
+  double y1 = y0 + 2. / 3. * (qy - y0);
+  double x2 = x3 + 2. / 3. * (qx - x3);
+  double y2 = y3 + 2. / 3. * (qy - y3);
+  ControlPoint CP;
+  if (rel) {
+    double X, Y;
+    cairo_get_current_point(cairo, &X, &Y);
+    CP = {X + x2, Y + y2};
+    cairo_rel_curve_to(cairo, x1, y1, x2, y2, x3, y3);
+  } else {
+    CP = {x2, y2};
+    cairo_curve_to(cairo, x1, y1, x2, y2, x3, y3);
+  }
+  return CP;
+}
+
 CairoSVGWriter::PathErrorOr<CairoSVGWriter::ControlPoint>
 CairoSVGWriter::CairoExecuteQuadraticBezier(std::string_view args, bool rel) {
   if (args.empty())
     return PathError("No arguments given to Q/q command");
-  PathNumber<true> cpX, cpY, destX, destY;
+  PathNumber<true> qxArg, qyArg, x3Arg, y3Arg;
   ControlPoint CP;
   while (args.size()) {
-    if (!ExtractPathArgs(args, cpX, cpY, destX, destY))
-      return PathError("Not enough arguments given to Q/q command");
-    double x0, y0;
-    cairo_get_current_point(cairo.get(), &x0, &y0);
-    auto x3 = strview_to_double(*destX);
-    auto y3 = strview_to_double(*destY);
-    // the quadratic curve's control point
-    auto qx = strview_to_double(*cpX);
-    auto qy = strview_to_double(*cpY);
-    if (!(x3 && y3 && qx && qy))
+    if (!ExtractPathArgs(args, qxArg, qyArg, x3Arg, y3Arg))
       return PathError("Invalid arguments given to Q/q command");
-    // https://stackoverflow.com/a/3162732/1468532
-    double x1 = x0 + 2. / 3. * (*qx - x0);
-    double y1 = y0 + 2. / 3. * (*qy - y0);
-    double x2 = *x3 + 2. / 3. * (*qx - *x3);
-    double y2 = *y3 + 2. / 3. * (*qy - *y3);
-    if (rel) {
-      CP = {x0 + x2, y0 + y2};
-      cairo_rel_curve_to(cairo.get(), x1, y1, x2, y2, *x3, *y3);
-    } else {
-      CP = {x2, y2};
-      cairo_curve_to(cairo.get(), x1, y1, x2, y2, *x3, *y3);
-    }
+    double x3 = x3Arg.toDouble(), y3 = y3Arg.toDouble();
+    // the quadratic curve's control point
+    double qx = qxArg.toDouble(), qy = qyArg.toDouble();
+    CP = CairoDrawQuadraticCurve(cairo.get(), qx, qy, x3, y3, rel);
   }
   return CP;
 }
@@ -744,12 +768,35 @@ CairoSVGWriter::CairoExecuteSmoothQuadraticBezier(
     const std::optional<ControlPoint> &PrevCP) {
   if (args.empty())
     return PathError("No arguments given to T/t command");
-  PathNumber<true> x3, y3;
+  PathNumber<true> x3Arg, y3Arg;
   ControlPoint CP;
+  if (!PrevCP) {
+    double x0, y0;
+    cairo_get_current_point(cairo.get(), &x0, &y0);
+    CP = {x0, y0};
+  } else
+    CP = *PrevCP;
   while (args.size()) {
-    if (!ExtractPathArgs(args, x3, y3))
-      return PathError("Not enough arguments given to T/t command");
-    // TODO
+    if (!ExtractPathArgs(args, x3Arg, y3Arg))
+      return PathError("Invalid arguments given to T/t command");
+    double x0, y0;
+    cairo_get_current_point(cairo.get(), &x0, &y0);
+    // CP is an absolute point and for a **cubic** curve
+    // From the formula that converts a quadratic control point into two
+    // cubic ones follows:
+    // x2 = x3 + 2/3 (q - x3) <=> q = 3/2(x2 - x3) + x3
+    // In this function's context x2 is CP and x3 the current point
+    double qx = 1.5 * (CP.first - x0) + x0, qy = 1.5 * (CP.second - y0) + y0;
+    // qx is now the previous control point in absolute coordinates.
+    // Therefore, mirror it on x0 and make it relative if necessary
+    qx = 2 * x0 - qx;
+    qy = 2 * y0 - qy;
+    if (rel) {
+      qx -= x0;
+      qy -= y0;
+    }
+    double x3 = x3Arg.toDouble(), y3 = y3Arg.toDouble();
+    CP = CairoDrawQuadraticCurve(cairo.get(), qx, qy, x3, y3, rel);
   }
   return CP;
 }
@@ -937,6 +984,7 @@ CairoSVGWriter::PathErrorOrVoid
 CairoSVGWriter::CairoExecutePath(const char *pathRaw) {
   std::string_view path = strview_trim(pathRaw);
   const char commands[] = "MmLlHhVvCcSsQqTtAaZz";
+  std::optional<ControlPoint> PrevCP;
   // Invariant: There is always non-whitespace content in path and path is
   // trimmed
   while (path.size()) {
@@ -954,7 +1002,6 @@ CairoSVGWriter::CairoExecutePath(const char *pathRaw) {
       path.remove_prefix(argsEnd);
     const bool rel = std::tolower(cmd) == cmd;
     PathErrorOrVoid err;
-    std::optional<ControlPoint> PrevCP;
     switch (std::tolower(cmd)) {
     case 'm':
       err = CairoExecuteMoveTo(args, rel);
