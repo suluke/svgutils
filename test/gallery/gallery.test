@@ -1,5 +1,7 @@
 REQUIRES: Cairo
+RUN: tools/svg2png/svg2png -o %T/arcs02.png %S/../Inputs/arcs02.svg
 RUN: tools/svg2png/svg2png -o %T/Blood_1.png %S/../Inputs/Blood_1.svg
+RUN: tools/svg2png/svg2png -o %T/CapasEscudosTaller.png %S/../Inputs/CapasEscudosTaller.svg
 RUN: tools/svg2png/svg2png -o %T/Creative_Commons_mapa_mundial.png %S/../Inputs/Creative_Commons_mapa_mundial.svg
 RUN: tools/svg2png/svg2png -o %T/Esparadrapo.png %S/../Inputs/Esparadrapo.svg
 RUN: tools/svg2png/svg2png -o %T/Filmstreifen2.png %S/../Inputs/Filmstreifen2.svg
