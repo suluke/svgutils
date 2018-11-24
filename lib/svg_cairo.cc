@@ -810,9 +810,7 @@ CairoSVGWriter::CairoExecuteArc(std::string_view args, bool rel) {
       rx = midLen;
       cos = 1.;
     }
-    std::cerr << "cos: " << cos << '\n';
     const double teta = std::acos(cos);
-    std::cerr << "teta: " << teta / Pi * 180 << " degrees\n";
     const double midToCLen = rx * std::sin(teta);
     double normx = conny / connLen, normy = -connx / connLen;
     double cx1 = midx + normx * midToCLen, cy1 = midy + normy * midToCLen;
