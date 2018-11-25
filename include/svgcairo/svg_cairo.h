@@ -18,6 +18,7 @@ class CairoSVGWriter {
 public:
   using self_t = CairoSVGWriter;
   using AttrContainer = std::vector<SVGAttribute>;
+  using RetTy = SVGWriterErrorOr<CairoSVGWriter *>;
 
   enum OutputFormat { PDF, PNG };
 
@@ -35,35 +36,35 @@ public:
   CairoSVGWriter &operator=(const CairoSVGWriter &) = delete;
 
 #define SVG_TAG(NAME, STR, ...)                                                \
-  template <typename... attrs_t> self_t &NAME(attrs_t... attrs) {              \
+  template <typename... attrs_t> RetTy NAME(attrs_t... attrs) {              \
     AttrContainer attrsVec({std::forward<attrs_t>(attrs)...});                 \
     NAME(attrsVec);                                                            \
-    return *this;                                                              \
+    return this;                                                              \
   }                                                                            \
-  template <typename container_t> self_t &NAME(const container_t &attrs) {     \
+  template <typename container_t> RetTy NAME(const container_t &attrs) {     \
     AttrContainer attrsVec(attrs.begin(), attrs.end());                        \
     NAME(attrsVec);                                                            \
-    return *this;                                                              \
+    return this;                                                              \
   }                                                                            \
-  self_t &NAME(const AttrContainer &attrs);                                    \
+  RetTy NAME(const AttrContainer &attrs);                                    \
   void NAME##_impl(const AttrContainer &attrs);
 #include "svgutils/svg_entities.def"
   template <typename... attrs_t>
-  self_t &custom_tag(const char *name, attrs_t...) {
+  RetTy custom_tag(const char *name, attrs_t...) {
     return custom_tag(name, std::vector<SVGAttribute>{});
   }
   template <typename container_t>
-  self_t &custom_tag(const char *name, const container_t &) {
+  RetTy custom_tag(const char *name, const container_t &) {
     return custom_tag(name, std::vector<SVGAttribute>{});
   }
-  self_t &custom_tag(const char *name, const std::vector<SVGAttribute> &);
+  RetTy custom_tag(const char *name, const std::vector<SVGAttribute> &);
 
-  self_t &content(const char *text);
-  self_t &comment(const char *comment);
+  RetTy content(const char *text);
+  RetTy comment(const char *comment);
 
-  self_t &enter();
-  self_t &leave();
-  self_t &finish();
+  RetTy enter();
+  RetTy leave();
+  RetTy finish();
 
   void setDefaultWidth(double w) { dfltWidth = w; }
   void setDefaultHeight(double h) { dfltHeight = h; }

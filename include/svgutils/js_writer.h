@@ -8,6 +8,7 @@ namespace svg {
 struct SVGJSWriter : public svg::SVGWriterBase<SVGJSWriter> {
   using self_t = SVGJSWriter;
   using base_t = svg::SVGWriterBase<self_t>;
+  using RetTy = SVGWriterErrorOr<SVGJSWriter *>;
   using outstream_t = svg::outstream_t;
   SVGJSWriter(outstream_t &outstream,
               const char *CreatedTagsListName = "rootTags")
@@ -20,33 +21,33 @@ struct SVGJSWriter : public svg::SVGWriterBase<SVGJSWriter> {
     writeIndent();
     output() << "SVGWriterState.rootTags = " << CreatedTagsListName << ";\n";
   }
-  self_t &enter() {
+  RetTy enter() {
     writeJSLine("if (SVGWriterState.currentTag === null)");
     ++indent;
     writeJSLine("throw new Error('No current tag: Cannot enter');");
     --indent;
     writeJSLine("SVGWriterState.parentTags.push(SVGWriterState.currentTag);");
     writeJSLine("SVGWriterState.currentTag = null;");
-    return *this;
+    return this;
   }
-  self_t &leave() {
+  RetTy leave() {
     writeJSLine("if (SVGWriterState.parentTags.length === 0)");
     ++indent;
     writeJSLine("throw new Error('No parent tags: Cannot leave');");
     --indent;
     writeJSLine("SVGWriterState.currentTag = SVGWriterState.parentTags.pop();");
-    return *this;
+    return this;
   }
-  self_t &finish() {
+  RetTy finish() {
     --indent;
-    return *this;
+    return this;
   }
-  self_t &content(const char *text) {
+  RetTy content(const char *text) {
     writeIndent();
     output() << "SVGWriterState.parentTags[SVGWriterState.parentTags.length - "
                 "1].innerHTML = '"
              << text << "';\n";
-    return *this;
+    return this;
   }
 
 private:

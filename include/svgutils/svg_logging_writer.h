@@ -5,62 +5,85 @@
 
 namespace svg {
 
+struct SVGDummyWriter : public SVGWriterBase<SVGDummyWriter> {
+  using base_t = SVGWriterBase<SVGDummyWriter>;
+  using RetTy = SVGWriterErrorOr<SVGDummyWriter *>;
+  SVGDummyWriter() : base_t(/* could be anything */ std::cout) {}
+
+  RetTy content(const char *text) {
+    closeTag();
+    return this;
+  }
+  RetTy comment(const char *comment) {
+    closeTag();
+    return this;
+  }
+
+private:
+  friend base_t;
+  template <typename container_t>
+  void openTag(const char *tagname, const container_t &attrs) {
+    closeTag();
+    base_t::currentTag = tagname;
+  }
+  void closeTag() {
+    if (base_t::currentTag) {
+      base_t::currentTag = nullptr;
+    }
+  }
+};
+
 template <typename WrappedTy> struct SVGLoggingWriter {
   using self_t = SVGLoggingWriter<WrappedTy>;
+  using RetTy = SVGWriterErrorOr<SVGLoggingWriter *>;
   template <typename... args_t>
-  SVGLoggingWriter(args_t &&... args) : writer(std::forward<args_t>(args)...) {}
+  SVGLoggingWriter(outstream_t &os, args_t &&... args)
+      : os(&os), writer(std::forward<args_t>(args)...) {}
   SVGLoggingWriter(self_t &&) = default;
   self_t &operator=(self_t &&) = default;
 
 #define SVG_TAG(NAME, STR, ...)                                                \
-  template <typename... attrs_t> self_t &NAME(attrs_t... attrs) {              \
+  template <typename... attrs_t> RetTy NAME(attrs_t... attrs) {                \
     std::vector<SVGAttribute> attrsVec({std::forward<attrs_t>(attrs)...});     \
     return NAME(attrsVec);                                                     \
   }                                                                            \
-  template <typename container_t> self_t &NAME(const container_t &attrs) {     \
+  template <typename container_t> RetTy NAME(const container_t &attrs) {       \
     log(#NAME, &attrs);                                                        \
-    writer.NAME(attrs);                                                        \
-    return *this;                                                              \
+    return writer.NAME(attrs).with_value(this);                                \
   }
 #include "svgutils/svg_entities.def"
 
   template <typename... attrs_t>
-  self_t &custom_tag(const char *tagname, attrs_t... attrs) {
+  RetTy custom_tag(const char *tagname, attrs_t... attrs) {
     std::vector<SVGAttribute> attrsVec({std::forward<attrs_t>(attrs)...});
     return custom_tag(tagname, attrsVec);
   }
   template <typename container_t>
-  self_t &custom_tag(const char *tagname, const container_t &attrs) {
+  RetTy custom_tag(const char *tagname, const container_t &attrs) {
     log(tagname, &attrs);
-    writer.custom_tag(tagname, attrs);
-    return *this;
+    return writer.custom_tag(tagname, attrs).with_value(this);
   }
 
-  self_t &comment(const char *comment) {
+  RetTy comment(const char *comment) {
     log<std::vector<SVGAttribute>>("comment", nullptr, comment);
-    writer.comment(comment);
-    return *this;
+    return writer.comment(comment).with_value(this);
   }
-  self_t &content(const char *text) {
+  RetTy content(const char *text) {
     log<std::vector<SVGAttribute>>("content", nullptr, text);
-    writer.content(text);
-    return *this;
+    return writer.content(text).with_value(this);
   }
 
-  self_t &enter() {
+  RetTy enter() {
     log("enter");
-    writer.enter();
-    return *this;
+    return writer.enter().with_value(this);
   }
-  self_t &leave() {
+  RetTy leave() {
     log("leave");
-    writer.leave();
-    return *this;
+    return writer.leave().with_value(this);
   }
-  self_t &finish() {
+  RetTy finish() {
     log("finish");
-    writer.finish();
-    return *this;
+    return writer.finish().with_value(this);
   }
 
   WrappedTy &getWriter() { return writer; }
@@ -70,21 +93,24 @@ template <typename WrappedTy> struct SVGLoggingWriter {
   template <typename container_t>
   void log(const char *action, const container_t *attrs = nullptr,
            const char *text = nullptr) {
-    std::cout << action;
+    outs() << action;
     if (attrs && attrs->size()) {
-      std::cout << '(';
+      outs() << '(';
       auto It = attrs->begin(), End = attrs->end();
-      std::cout << *(It++);
+      outs() << *(It++);
       for (; It != End; ++It)
-        std::cout << ", " << *It;
-      std::cout << ')';
+        outs() << ", " << *It;
+      outs() << ')';
     }
     if (text)
-      std::cout << ": \"" << text << "\"";
-    std::cout << std::endl;
+      outs() << ": \"" << text << "\"";
+    outs() << std::endl;
   }
 
 private:
+  outstream_t &outs() { return *os; }
+
+  outstream_t *os;
   WrappedTy writer;
 };
 } // namespace svg

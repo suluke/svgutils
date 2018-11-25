@@ -11,6 +11,7 @@ namespace plots {
 template <typename WriterTy>
 struct PlotWriter : public svg::ExtendableWriter<PlotWriter<WriterTy>> {
   using base_t = svg::ExtendableWriter<PlotWriter<WriterTy>>;
+  using RetTy = svg::SVGWriterErrorOr<PlotWriter *>;
 
   template <typename... args_t>
   PlotWriter(args_t &&... args)
@@ -18,13 +19,13 @@ struct PlotWriter : public svg::ExtendableWriter<PlotWriter<WriterTy>> {
             std::forward<args_t>(args)...)) {}
 
   template <typename... attrs_t>
-  PlotWriter &grid(double top, double left, double width, double height,
+  RetTy grid(double top, double left, double width, double height,
                    double distx, double disty, attrs_t... attrs) {
     std::vector<svg::SVGAttribute> attrVec({std::forward<attrs_t>(attrs)...});
     return grid(top, left, width, height, distx, disty, attrVec);
   }
   template <typename container_t>
-  PlotWriter &grid(double top, double left, double width, double height,
+  RetTy grid(double top, double left, double width, double height,
                    double distx, double disty, const container_t &attrs) {
     using namespace svg;
     std::vector<svg::SVGAttribute> attrsExt(attrs.begin(), attrs.end());
@@ -41,16 +42,17 @@ struct PlotWriter : public svg::ExtendableWriter<PlotWriter<WriterTy>> {
                       {x1(i), y1(top), x2(i), y2(top + height)});
       self.line(attrsExt);
     }
-    return *this;
+    return this;
   }
 };
 
 struct PlotWriterConcept : public virtual svg::WriterConcept {
-  virtual PlotWriterConcept &
+  using RetTy = svg::SVGWriterErrorOr<PlotWriterConcept *>;
+  virtual RetTy
   grid(double top, double left, double width, double height, double distx,
        double disty, const std::vector<svg::SVGAttribute> &attrs) = 0;
   template <typename... attrs_t>
-  PlotWriterConcept &grid(double top, double left, double width, double height,
+  RetTy grid(double top, double left, double width, double height,
                           double distx, double disty, attrs_t... attrs) {
     std::vector<svg::SVGAttribute> attrVec({std::forward<attrs_t>(attrs)...});
     return grid(top, left, width, height, distx, disty, attrVec);
@@ -61,15 +63,15 @@ template <typename WriterTy>
 struct PlotWriterModel : public PlotWriterConcept,
                          public svg::WriterModel<WriterTy> {
   using ModelBase_t = svg::WriterModel<WriterTy>;
+  using RetTy = PlotWriterConcept::RetTy;
   template <typename... args_t>
   PlotWriterModel(args_t &&... args)
       : ModelBase_t(std::forward<args_t>(args)...) {}
-  PlotWriterConcept &
+  RetTy
   grid(double top, double left, double width, double height, double distx,
        double disty, const std::vector<svg::SVGAttribute> &attrs) override {
-    this->ModelBase_t::Writer.grid(top, left, width, height, distx, disty,
-                                   attrs);
-    return *this;
+    return this->ModelBase_t::Writer.grid(top, left, width, height, distx, disty,
+                                   attrs).with_value(static_cast<PlotWriterConcept *>(this));
   }
 };
 

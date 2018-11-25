@@ -16,10 +16,11 @@ template <typename WriterTy> void testSVG() {
   // from SVGWriterBase (or any subclass that may already exist)
   // If you want to add functionality, inherit from ExtendableWriter
   struct ExtendedWriter : public ExtendableWriter<ExtendedWriter> {
+    using RetTy = SVGWriterErrorOr<ExtendedWriter *>;
     ExtendedWriter(svg::outstream_t &os)
         : ExtendableWriter<ExtendedWriter>(
               std::make_unique<WriterModel<WriterTy>>(os)) {}
-    ExtendedWriter &helloWorld() {
+    RetTy helloWorld() {
       // We can use containers to pass attributes as well
       std::array<SVGAttribute, 3> rectAttrs(
           {width("100%"), height("100%"), fill("red")});
@@ -28,26 +29,26 @@ template <typename WriterTy> void testSVG() {
       auto &self = static_cast<ExtendableWriter<ExtendedWriter> &>(*this);
       self.rect(rectAttrs)
           // The following currently forces a newline in the formatted output
-          .enter()
-          .leave()
-          .circle(cx(150), cy(100), r(80), fill("green"))
-          .text(x(150), y(125), font_size(60), text_anchor("middle"),
+          ->enter()
+          ->leave()
+          ->circle(cx(150), cy(100), r(80), fill("green"))
+          ->text(x(150), y(125), font_size(60), text_anchor("middle"),
                 fill("white"))
-          .enter()
-          .content("SVG")
-          .leave();
-      return *this;
+          ->enter()
+          ->content("SVG")
+          ->leave();
+      return this;
     }
   };
   ExtendedWriter svg(std::cout);
   svg.svg(xmlns(), baseProfile(), version(), width(300), height(200))
-      .enter()
-      .helloWorld();
+      ->enter()
+      ->helloWorld();
   // different writers are easily combinable if implemented correctly
   plots::PlotWriter<WriterTy> plot(std::cout);
   svg.continueAs(plot)
       .grid(0, 0, 300, 200, 10, 10, stroke("black"), stroke_dasharray("1 1"))
-      .finish();
+      ->finish();
   std::cout << "\n" << std::endl;
 }
 

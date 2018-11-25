@@ -20,13 +20,13 @@ void createMakeSVG() {
   JSFunc func("makeSVG(w, h)", std::cout);
   SVGJSWriter writer(std::cout, "rootTags");
   writer.svg(xmlns(), baseProfile(), version(), width("${w}"), height("${h}"))
-      .finish();
+      ->finish();
 }
 
 void createMakeRect() {
   JSFunc func("makeRect(x, y, w, h)", std::cout);
   SVGJSWriter writer(std::cout, "rootTags");
-  writer.rect(x("${x}"), y("${y}"), width("${w}"), height("${h}")).finish();
+  writer.rect(x("${x}"), y("${y}"), width("${w}"), height("${h}"))->finish();
 }
 
 int main() {

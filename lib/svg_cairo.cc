@@ -81,20 +81,20 @@ CairoSVGWriter::CairoSVGWriter(const fs::path &outfile, OutputFormat fmt,
   initCairo();
 }
 
-CairoSVGWriter &
+CairoSVGWriter::RetTy
 CairoSVGWriter::custom_tag(const char *name,
                            const std::vector<SVGAttribute> &attrs) {
   // We mostly ignore all custom tags
   openTag(TagType::CUSTOM, attrs);
-  return *this;
+  return this;
 }
 
-CairoSVGWriter &CairoSVGWriter::content(const char *text) {
+CairoSVGWriter::RetTy CairoSVGWriter::content(const char *text) {
   closeTag();
   if (ignore)
-    return *this;
+    return this;
   if (text == nullptr)
-    return *this;
+    return this;
   if (!parents.size())
     svg_unreachable("Encountered stray text on the top level of the document");
   TagType parentTag = parents.top();
@@ -102,7 +102,7 @@ CairoSVGWriter &CairoSVGWriter::content(const char *text) {
     std::cerr << "Content is only supported in text nodes at the "
                  "moment.\nContent for tag "
               << parentTag << " will be ignored\n";
-    return *this;
+    return this;
   }
   // How cairo_show_text does it:
   // https://github.com/Distrotech/cairo/blob/17ef4acfcb64d1c525910a200e60d63087953c4c/src/cairo.c#L3197
@@ -153,7 +153,7 @@ CairoSVGWriter &CairoSVGWriter::content(const char *text) {
       svg_unreachable("Failed to convert text to glyphs");
 
     if (num_glyphs == 0)
-      return *this;
+      return this;
 
     glyphs = {glyphs_raw, cairo_glyph_free};
     clusters = {clusters_raw, cairo_text_cluster_free};
@@ -200,28 +200,30 @@ CairoSVGWriter &CairoSVGWriter::content(const char *text) {
   y = last_glyph->y + extents.y_advance;
   cairo_move_to(cairo.get(), x, y);
 
-  return *this;
+  return this;
 }
 
-CairoSVGWriter &CairoSVGWriter::comment(const char *comment) { return *this; }
+CairoSVGWriter::RetTy CairoSVGWriter::comment(const char *comment) {
+  return this;
+}
 
-CairoSVGWriter &CairoSVGWriter::enter() {
+CairoSVGWriter::RetTy CairoSVGWriter::enter() {
   assert(currentTag != TagType::NONE && "Cannot enter without root tag");
   if (currentTag == TagType::CUSTOM || ignore)
     ++ignore;
   parents.push(currentTag);
   currentTag = TagType::NONE;
-  return *this;
+  return this;
 }
-CairoSVGWriter &CairoSVGWriter::leave() {
+CairoSVGWriter::RetTy CairoSVGWriter::leave() {
   assert(parents.size() && "Cannot leave: No parent tag");
   if (ignore)
     --ignore;
   currentTag = parents.top();
   parents.pop();
-  return *this;
+  return this;
 }
-CairoSVGWriter &CairoSVGWriter::finish() {
+CairoSVGWriter::RetTy CairoSVGWriter::finish() {
   ignore = 0;
   while (parents.size())
     leave();
@@ -234,7 +236,7 @@ CairoSVGWriter &CairoSVGWriter::finish() {
     cairo_surface_write_to_png(surface.get(), outfile.c_str());
     break;
   }
-  return *this;
+  return this;
 }
 
 void CairoSVGWriter::closeTag() {
@@ -363,12 +365,12 @@ void CairoSVGWriter::applyCSSFillAndStroke(bool preserve) {
 }
 
 #define SVG_TAG(NAME, STR, ...)                                                \
-  CairoSVGWriter &CairoSVGWriter::NAME(const AttrContainer &attrs) {           \
+  CairoSVGWriter::RetTy CairoSVGWriter::NAME(const AttrContainer &attrs) {     \
     if (ignore)                                                                \
-      return *this;                                                            \
+      return this;                                                             \
     openTag(TagType::NAME, attrs);                                             \
     NAME##_impl(attrs);                                                        \
-    return *this;                                                              \
+    return this;                                                               \
   }
 #include "svgutils/svg_entities.def"
 

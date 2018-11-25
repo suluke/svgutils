@@ -116,74 +116,153 @@ struct SVGAttributeVisitor {
   }
 };
 
+struct SVGWriterError {
+  explicit SVGWriterError(const std::string &msg) : msg(msg) {}
+  SVGWriterError(const SVGWriterError &) = default;
+  SVGWriterError &operator=(const SVGWriterError &) = default;
+  SVGWriterError(SVGWriterError &&) = default;
+  SVGWriterError &operator=(SVGWriterError &&) = default;
+
+  const std::string &what() const { return msg; }
+
+private:
+  std::string msg;
+};
+
+template <typename T> struct SVGWriterErrorOr {
+  SVGWriterErrorOr(T val) : val(val) {}
+  SVGWriterErrorOr(const SVGWriterError &err) : val(err) {}
+
+  SVGWriterErrorOr(const SVGWriterErrorOr &) = default;
+  SVGWriterErrorOr &operator=(const SVGWriterErrorOr &) = default;
+  SVGWriterErrorOr(SVGWriterErrorOr &&) = default;
+  SVGWriterErrorOr &operator=(SVGWriterErrorOr &&) = default;
+
+  /// Returns true if an error occurred
+  operator bool() const { return std::holds_alternative<SVGWriterError>(val); }
+  const T operator->() const {
+    assert(!*this && "Unchecked value extraction from SVGWriterErrorOr<>");
+    return std::get<T>(val);
+  }
+  const SVGWriterError &to_error() const {
+    assert(
+        *this &&
+        "Trying to extract error from SVGWriterErrorOr<> in non-error state");
+    return std::get<SVGWriterError>(val);
+  }
+  template <typename U> SVGWriterErrorOr<U> with_value(U val) const {
+    if (*this)
+      return SVGWriterErrorOr<U>(this->to_error());
+    return SVGWriterErrorOr<U>(val);
+  }
+  SVGWriterErrorOr<void> without_value() const;
+
+private:
+  std::variant<SVGWriterError, T> val;
+};
+
+template <> struct SVGWriterErrorOr<void> {
+  SVGWriterErrorOr() = default;
+  SVGWriterErrorOr(const SVGWriterError &err) : err(err) {}
+
+  SVGWriterErrorOr(const SVGWriterErrorOr &) = default;
+  SVGWriterErrorOr &operator=(const SVGWriterErrorOr &) = default;
+  SVGWriterErrorOr(SVGWriterErrorOr &&) = default;
+  SVGWriterErrorOr &operator=(SVGWriterErrorOr &&) = default;
+
+  /// Returns true if an error occurred
+  operator bool() const { return !!err; }
+  const SVGWriterError &to_error() const {
+    assert(
+        *this &&
+        "Trying to extract error from SVGWriterErrorOr<> in non-error state");
+    return *err;
+  }
+  template <typename U> SVGWriterErrorOr<U> with_value(U val) const {
+    if (*this)
+      return SVGWriterErrorOr<U>(this->to_error());
+    return SVGWriterErrorOr<U>(val);
+  }
+
+private:
+  std::optional<SVGWriterError> err;
+};
+
+template <typename T>
+SVGWriterErrorOr<void> SVGWriterErrorOr<T>::without_value() const {
+  if (*this)
+    return SVGWriterErrorOr<void>(this->to_error());
+  return SVGWriterErrorOr<void>{};
+}
+
 /// Base implementation of a writer for svg documents.
 /// Allows overriding most member functions using CRTP.
 template <typename DerivedTy> class SVGWriterBase {
 public:
   SVGWriterBase(outstream_t &output) : outstream(&output) {}
 
+  using RetTy = SVGWriterErrorOr<DerivedTy *>;
 #define SVG_TAG(NAME, STR)                                                     \
-  template <typename... attrs_t> DerivedTy &NAME(attrs_t... attrs) {           \
+  template <typename... attrs_t> RetTy NAME(attrs_t... attrs) {                \
     openTag(STR, std::forward<attrs_t>(attrs)...);                             \
-    return *static_cast<DerivedTy *>(this);                                    \
+    return static_cast<DerivedTy *>(this);                                     \
   }                                                                            \
-  template <typename container_t> DerivedTy &NAME(const container_t &attrs) {  \
+  template <typename container_t> RetTy NAME(const container_t &attrs) {       \
     std::vector<SVGAttribute> attrsVec(attrs.begin(), attrs.end());            \
     static_cast<DerivedTy *>(this)->openTag(STR, attrsVec);                    \
-    return *static_cast<DerivedTy *>(this);                                    \
+    return static_cast<DerivedTy *>(this);                                     \
   }                                                                            \
-  DerivedTy &NAME(const std::vector<SVGAttribute> &attrs) {                    \
+  RetTy NAME(const std::vector<SVGAttribute> &attrs) {                         \
     static_cast<DerivedTy *>(this)->openTag(STR, attrs);                       \
-    return *static_cast<DerivedTy *>(this);                                    \
+    return static_cast<DerivedTy *>(this);                                     \
   }
 #include "svg_entities.def"
 
   template <typename... attrs_t>
-  DerivedTy &custom_tag(const char *name, attrs_t... attrs) {
+  RetTy custom_tag(const char *name, attrs_t... attrs) {
     openTag(name, std::forward<attrs_t>(attrs)...);
-    return *static_cast<DerivedTy *>(this);
+    return static_cast<DerivedTy *>(this);
   }
   template <typename container_t>
-  DerivedTy &custom_tag(const char *name, const container_t &attrs) {
+  RetTy custom_tag(const char *name, const container_t &attrs) {
     std::vector<SVGAttribute> attrsVec(attrs.begin(), attrs.end());
     static_cast<DerivedTy *>(this)->openTag(name, attrsVec);
-    return *static_cast<DerivedTy *>(this);
+    return static_cast<DerivedTy *>(this);
   }
-  DerivedTy &custom_tag(const char *name,
-                        const std::vector<SVGAttribute> &attrs) {
+  RetTy custom_tag(const char *name, const std::vector<SVGAttribute> &attrs) {
     static_cast<DerivedTy *>(this)->openTag(name, attrs);
-    return *static_cast<DerivedTy *>(this);
+    return static_cast<DerivedTy *>(this);
   }
 
-  DerivedTy &content(const char *text) {
+  RetTy content(const char *text) {
     static_cast<DerivedTy *>(this)->closeTag();
     output() << text;
-    return *static_cast<DerivedTy *>(this);
+    return static_cast<DerivedTy *>(this);
   }
-  DerivedTy &comment(const char *comment) {
+  RetTy comment(const char *comment) {
     static_cast<DerivedTy *>(this)->closeTag();
     output() << "<!-- " << comment << " -->";
-    return *static_cast<DerivedTy *>(this);
+    return static_cast<DerivedTy *>(this);
   }
 
-  DerivedTy &enter() {
+  RetTy enter() {
     assert(currentTag && "Cannot enter without root tag");
     parents.push(currentTag);
     currentTag = nullptr;
-    return *static_cast<DerivedTy *>(this);
+    return static_cast<DerivedTy *>(this);
   }
-  DerivedTy &leave() {
+  RetTy leave() {
     assert(parents.size() && "Cannot leave: No parent tag");
     static_cast<DerivedTy *>(this)->closeTag();
     currentTag = parents.top();
     parents.pop();
-    return *static_cast<DerivedTy *>(this);
+    return static_cast<DerivedTy *>(this);
   }
-  DerivedTy &finish() {
+  RetTy finish() {
     while (parents.size())
       static_cast<DerivedTy *>(this)->leave();
     static_cast<DerivedTy *>(this)->closeTag();
-    return *static_cast<DerivedTy *>(this);
+    return static_cast<DerivedTy *>(this);
   }
 
 protected:
@@ -234,42 +313,49 @@ struct SVGWriter : public SVGWriterBase<SVGWriter> {
 /// writers.
 struct WriterConcept {
   virtual ~WriterConcept() = default;
+  using RetTy = SVGWriterErrorOr<void>;
 
 #define SVG_TAG(NAME, STR, ...)                                                \
   template <typename... attrs_t> void NAME(attrs_t... attrs) {                 \
     std::vector<SVGAttribute> attrsVec({std::forward<attrs_t>(attrs)...});     \
     NAME(attrsVec);                                                            \
   }                                                                            \
-  virtual void NAME(const std::vector<SVGAttribute> &attrs) = 0;
+  virtual RetTy NAME(const std::vector<SVGAttribute> &attrs) = 0;
 #include "svg_entities.def"
-  virtual void custom_tag(const char *tag,
-                          const std::vector<SVGAttribute> &attrs) = 0;
-  virtual void enter() = 0;
-  virtual void leave() = 0;
-  virtual void content(const char *) = 0;
-  virtual void comment(const char *) = 0;
-  virtual void finish() = 0;
+  virtual RetTy custom_tag(const char *tag,
+                           const std::vector<SVGAttribute> &attrs) = 0;
+  virtual RetTy enter() = 0;
+  virtual RetTy leave() = 0;
+  virtual RetTy content(const char *) = 0;
+  virtual RetTy comment(const char *) = 0;
+  virtual RetTy finish() = 0;
 };
 
 /// Helper class to convert from virtual dispatch to template member
 /// functions.
 template <typename WriterTy> struct WriterModel : public virtual WriterConcept {
+  using RetTy = WriterConcept::RetTy;
+
   template <typename... args_t>
   WriterModel(args_t &&... args) : Writer(std::forward<args_t>(args)...) {}
 #define SVG_TAG(NAME, STR, ...)                                                \
-  void NAME(const std::vector<SVGAttribute> &attrs) override {                 \
-    Writer.NAME(attrs);                                                        \
+  RetTy NAME(const std::vector<SVGAttribute> &attrs) override {                \
+    return Writer.NAME(attrs).without_value();                                 \
   }
 #include "svg_entities.def"
-  void custom_tag(const char *tag,
-                  const std::vector<SVGAttribute> &attrs) override {
-    Writer.custom_tag(tag, attrs);
+  RetTy custom_tag(const char *tag,
+                   const std::vector<SVGAttribute> &attrs) override {
+    return Writer.custom_tag(tag, attrs).without_value();
   }
-  void enter() override { Writer.enter(); }
-  void leave() override { Writer.leave(); }
-  void content(const char *text) override { Writer.content(text); }
-  void comment(const char *comment) override { Writer.comment(comment); }
-  void finish() override { Writer.finish(); }
+  RetTy enter() override { return Writer.enter().without_value(); }
+  RetTy leave() override { return Writer.leave().without_value(); }
+  RetTy content(const char *text) override {
+    return Writer.content(text).without_value();
+  }
+  RetTy comment(const char *comment) override {
+    return Writer.comment(comment).without_value();
+  }
+  RetTy finish() override { return Writer.finish().without_value(); }
   WriterTy &getWriter() { return Writer; }
 
 protected:
@@ -279,61 +365,54 @@ protected:
 /// Base class for clients that want to extend the capabilities of
 /// the svg document writers above without losing the flexibility of
 /// deciding which exact writer to use.
-template <typename DerivedT> struct ExtendableWriter {
+template <typename DerivedTy> struct ExtendableWriter {
   ExtendableWriter(std::unique_ptr<WriterConcept> Writer)
       : Writer(std::move(Writer)) {}
+
+  using RetTy = SVGWriterErrorOr<DerivedTy *>;
 #define SVG_TAG(NAME, STR, ...)                                                \
-  template <typename... attrs_t> DerivedT &NAME(attrs_t... attrs) {            \
+  template <typename... attrs_t> RetTy NAME(attrs_t... attrs) {                \
     std::vector<SVGAttribute> attrsVec({std::forward<attrs_t>(attrs)...});     \
-    Writer->NAME(attrsVec);                                                    \
-    return *static_cast<DerivedT *>(this);                                     \
+    return Writer->NAME(attrsVec).with_value(static_cast<DerivedTy *>(this));  \
   }                                                                            \
-  template <typename container_t> DerivedT &NAME(const container_t &attrs) {   \
+  template <typename container_t> RetTy NAME(const container_t &attrs) {       \
     std::vector<SVGAttribute> attrsVec(attrs.begin(), attrs.end());            \
-    Writer->NAME(attrsVec);                                                    \
-    return *static_cast<DerivedT *>(this);                                     \
+    return Writer->NAME(attrsVec).with_value(static_cast<DerivedTy *>(this));  \
   }                                                                            \
-  DerivedT &NAME(const std::vector<SVGAttribute> &attrs) {                     \
-    Writer->NAME(attrs);                                                       \
-    return *static_cast<DerivedT *>(this);                                     \
+  RetTy NAME(const std::vector<SVGAttribute> &attrs) {                         \
+    return Writer->NAME(attrs).with_value(static_cast<DerivedTy *>(this));     \
   }
 #include "svg_entities.def"
   template <typename... attrs_t>
-  DerivedT &custom_tag(const char *name, attrs_t... attrs) {
+  RetTy custom_tag(const char *name, attrs_t... attrs) {
     std::vector<SVGAttribute> attrsVec({std::forward<attrs_t>(attrs)...});
-    Writer->custom_tag(name, attrsVec);
-    return *static_cast<DerivedT *>(this);
+    return Writer->custom_tag(name, attrsVec)
+        .with_value(static_cast<DerivedTy *>(this));
   }
   template <typename container_t>
-  DerivedT &custom_tag(const char *name, const container_t &attrs) {
+  RetTy custom_tag(const char *name, const container_t &attrs) {
     std::vector<SVGAttribute> attrsVec(attrs.begin(), attrs.end());
-    Writer->custom_tag(name, attrsVec);
-    return *static_cast<DerivedT *>(this);
+    return Writer->custom_tag(name, attrsVec)
+        .with_value(static_cast<DerivedTy *>(this));
   }
-  DerivedT &custom_tag(const char *name,
-                       const std::vector<SVGAttribute> &attrs) {
-    Writer->custom_tag(name, attrs);
-    return *static_cast<DerivedT *>(this);
+  RetTy custom_tag(const char *name, const std::vector<SVGAttribute> &attrs) {
+    return Writer->custom_tag(name, attrs)
+        .with_value(static_cast<DerivedTy *>(this));
   }
-  DerivedT &enter() {
-    Writer->enter();
-    return *static_cast<DerivedT *>(this);
+  RetTy enter() {
+    return Writer->enter().with_value(static_cast<DerivedTy *>(this));
   }
-  DerivedT &leave() {
-    Writer->leave();
-    return *static_cast<DerivedT *>(this);
+  RetTy leave() {
+    return Writer->leave().with_value(static_cast<DerivedTy *>(this));
   }
-  DerivedT &content(const char *text) {
-    Writer->content(text);
-    return *static_cast<DerivedT *>(this);
+  RetTy content(const char *text) {
+    return Writer->content(text).with_value(static_cast<DerivedTy *>(this));
   }
-  DerivedT &comment(const char *text) {
-    Writer->comment(text);
-    return *static_cast<DerivedT *>(this);
+  RetTy comment(const char *text) {
+    return Writer->comment(text).with_value(static_cast<DerivedTy *>(this));
   }
-  DerivedT &finish() {
-    Writer->finish();
-    return *static_cast<DerivedT *>(this);
+  RetTy finish() {
+    return Writer->finish().with_value(static_cast<DerivedTy *>(this));
   }
   template <typename NewWriterT> NewWriterT &continueAs(NewWriterT &NewWriter) {
     static_cast<ExtendableWriter<NewWriterT> &>(NewWriter).Writer =

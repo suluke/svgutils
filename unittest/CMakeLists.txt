@@ -19,3 +19,4 @@ endfunction()
 
 add_svg_unittest(cli_args_test cli_args_test.cc)
 target_link_libraries(cli_args_test PRIVATE stdc++fs)
+add_svg_unittest(svg_logging_writer_test svg_logging_writer_test.cc)

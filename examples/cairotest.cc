@@ -11,19 +11,18 @@ void testCairo() {
   // We support attribute initialization with const char*, integers and
   // floats
   writer.svg(xmlns(), baseProfile(), version(), width(300), height(200))
-      .enter()
-      .rect(rectAttrs)
+      ->enter()
+      ->rect(rectAttrs)
       // The following currently forces a newline in the formatted output
-      .enter()
-      .leave()
-      .circle(cx(150), cy(100), r(80), fill("green"))
-      .text(x(150), y(125), font_size(60), text_anchor("middle"), fill("white"))
-      .enter()
-      .content("SVG")
-      .leave();
+      ->enter()
+      ->leave()
+      ->circle(cx(150), cy(100), r(80), fill("green"))
+      ->text(x(150), y(125), font_size(60), text_anchor("middle"), fill("white"))
+      ->enter()
+      ->content("SVG")
+      ->leave();
   plots::PlotWriter<WriterTy> plot(std::move(writer));
-  plot.grid(0, 0, 300, 200, 10, 10, stroke("black"), stroke_dasharray("1 1"));
-  plot.finish();
+  plot.grid(0, 0, 300, 200, 10, 10, stroke("black"), stroke_dasharray("1 1"))->finish();
 }
 
 int main() {

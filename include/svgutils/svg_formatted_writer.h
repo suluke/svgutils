@@ -8,30 +8,31 @@ namespace svg {
 struct SVGFormattedWriter : public SVGWriterBase<SVGFormattedWriter> {
   using self_t = SVGFormattedWriter;
   using base_t = SVGWriterBase<self_t>;
+  using RetTy = SVGWriterErrorOr<self_t *>;
 
   SVGFormattedWriter(outstream_t &os) : base_t(os) {}
   SVGFormattedWriter(outstream_t &os, char indentChar, size_t indentWidth)
       : base_t(os), indentChar(indentChar), indentWidth(indentWidth) {}
 
-  self_t &enter() {
+  RetTy enter() {
     base_t::enter();
     base_t::output() << "\n";
     ++indent;
     wasEntered.top() = true;
-    return *this;
+    return this;
   }
-  self_t &leave() {
+  RetTy leave() {
     base_t::leave();
     --indent;
-    return *this;
+    return this;
   }
-  self_t &content(const char *text) {
+  RetTy content(const char *text) {
     closeTag();
     writeIndent();
     base_t::output() << text << "\n";
-    return *this;
+    return this;
   }
-  self_t &comment(const char *comment) {
+  RetTy comment(const char *comment) {
     closeTag();
     writeIndent();
     output() << "<!--\n";
@@ -40,7 +41,7 @@ struct SVGFormattedWriter : public SVGWriterBase<SVGFormattedWriter> {
     output() << trimmed << '\n';
     writeIndent();
     output() << "-->\n";
-    return *this;
+    return this;
   }
 
 private:
